@@ -1,0 +1,172 @@
+[
+  {
+    "id": "DEMO_NOS_001",
+    "code": "DEMO_NOS_001",
+    "title": "Plan and Prepare for Electrical Work",
+    "description": "Ability to read electrical drawings, identify materials, plan work sequence, and obtain necessary permissions before beginning electrical installation or maintenance work.",
+    "mandatory": true,
+    "weight": 1.0,
+    "trade": "electrician",
+    "source_type": "DEMO",
+    "performance_criteria": [
+      "Correctly reads and interprets electrical drawings and diagrams",
+      "Identifies correct materials, tools, and equipment required",
+      "Plans work sequence to minimise disruption and risk",
+      "Obtains necessary permits before starting work"
+    ],
+    "keywords": ["planning", "drawing", "preparation", "materials", "permit", "schedule", "electrical drawing", "work order"]
+  },
+  {
+    "id": "DEMO_NOS_002",
+    "code": "DEMO_NOS_002",
+    "title": "Install Electrical Wiring Systems",
+    "description": "Ability to install cables, conduits, and wiring systems in domestic and light commercial premises following IS standards and local electrical codes.",
+    "mandatory": true,
+    "weight": 1.0,
+    "trade": "electrician",
+    "source_type": "DEMO",
+    "performance_criteria": [
+      "Selects correct cable type and size for the load",
+      "Routes cables safely through walls and conduits",
+      "Terminates cables correctly at switchboards and outlets",
+      "Ensures wiring is protected from mechanical damage"
+    ],
+    "keywords": ["wiring", "cable", "conduit", "house wiring", "domestic wiring", "installation", "IS code", "electrical installation"]
+  },
+  {
+    "id": "DEMO_NOS_003",
+    "code": "DEMO_NOS_003",
+    "title": "Install Switches, Sockets, and Fixtures",
+    "description": "Ability to install switches, socket outlets, fans, lights, and other electrical fixtures safely and correctly.",
+    "mandatory": true,
+    "weight": 0.9,
+    "trade": "electrician",
+    "source_type": "DEMO",
+    "performance_criteria": [
+      "Correctly identifies and installs appropriate switch types",
+      "Installs socket outlets at correct height and orientation",
+      "Installs ceiling fans and light fixtures safely",
+      "Tests all fixtures for correct operation after installation"
+    ],
+    "keywords": ["switch", "socket", "fan", "fixture", "light", "outlet", "installation", "switchboard", "MCB", "modular switch"]
+  },
+  {
+    "id": "DEMO_NOS_004",
+    "code": "DEMO_NOS_004",
+    "title": "Safe Isolation of Electrical Circuits",
+    "description": "Ability to safely isolate electrical circuits before working on them, following lockout-tagout procedures and verifying safe-to-work conditions.",
+    "mandatory": true,
+    "weight": 1.0,
+    "trade": "electrician",
+    "source_type": "DEMO",
+    "performance_criteria": [
+      "Identifies the correct isolation point for the circuit",
+      "Operates isolation device correctly and securely",
+      "Tests for absence of voltage using appropriate instruments",
+      "Applies lockout and warning notices before working"
+    ],
+    "keywords": ["isolation", "lockout", "tagout", "safe isolation", "MCB", "circuit breaker", "safety", "LOTO", "earthing"]
+  },
+  {
+    "id": "DEMO_NOS_005",
+    "code": "DEMO_NOS_005",
+    "title": "Electrical Fault Finding and Diagnosis",
+    "description": "Ability to systematically identify, locate, and diagnose electrical faults in wiring systems and equipment using appropriate test instruments.",
+    "mandatory": true,
+    "weight": 0.9,
+    "trade": "electrician",
+    "source_type": "DEMO",
+    "performance_criteria": [
+      "Uses multimeter or voltage tester correctly and safely",
+      "Applies systematic fault-finding process",
+      "Identifies open circuits, short circuits, and earth faults",
+      "Documents findings and proposed remedial action"
+    ],
+    "keywords": ["fault", "diagnosis", "testing", "multimeter", "tester", "line tester", "voltage tester", "fault finding", "troubleshooting", "open circuit", "short circuit"]
+  },
+  {
+    "id": "DEMO_NOS_006",
+    "code": "DEMO_NOS_006",
+    "title": "Install and Maintain Distribution Boards",
+    "description": "Ability to install, connect, and maintain main distribution boards, sub-distribution boards, MCBs, ELCBs, and associated protective devices.",
+    "mandatory": false,
+    "weight": 0.8,
+    "trade": "electrician",
+    "source_type": "DEMO",
+    "performance_criteria": [
+      "Correctly sizes and selects MCBs for circuit protection",
+      "Connects incoming supply and outgoing circuits correctly",
+      "Installs ELCB/RCD for earth fault protection",
+      "Labels all circuits clearly after installation"
+    ],
+    "keywords": ["distribution board", "DB", "MCB", "ELCB", "RCD", "circuit breaker", "panel", "switchboard", "fuse", "earthing"]
+  },
+  {
+    "id": "DEMO_NOS_007",
+    "code": "DEMO_NOS_007",
+    "title": "Earthing and Bonding",
+    "description": "Ability to install and verify earthing systems and protective bonding for electrical installations.",
+    "mandatory": true,
+    "weight": 0.9,
+    "trade": "electrician",
+    "source_type": "DEMO",
+    "performance_criteria": [
+      "Installs earth electrode or connects to building earth",
+      "Installs earth continuity conductors correctly",
+      "Tests earth continuity and resistance",
+      "Installs equipotential bonding to metalwork"
+    ],
+    "keywords": ["earthing", "grounding", "bonding", "earth electrode", "earth wire", "continuity", "resistance"]
+  },
+  {
+    "id": "DEMO_NOS_008",
+    "code": "DEMO_NOS_008",
+    "title": "Use of Electrical Test Instruments",
+    "description": "Ability to select, use, and maintain electrical test instruments safely and correctly for installation testing.",
+    "mandatory": false,
+    "weight": 0.7,
+    "trade": "electrician",
+    "source_type": "DEMO",
+    "performance_criteria": [
+      "Selects correct instrument for the measurement task",
+      "Operates instruments within their rated range safely",
+      "Interprets readings correctly",
+      "Maintains instruments in calibrated and safe condition"
+    ],
+    "keywords": ["multimeter", "tester", "instrument", "measurement", "test", "voltage", "current", "resistance", "continuity", "insulation"]
+  },
+  {
+    "id": "DEMO_NOS_009",
+    "code": "DEMO_NOS_009",
+    "title": "Health, Safety, and Electrical Regulations Compliance",
+    "description": "Ability to work safely and in compliance with relevant health and safety legislation and electrical regulations.",
+    "mandatory": true,
+    "weight": 1.0,
+    "trade": "electrician",
+    "source_type": "DEMO",
+    "performance_criteria": [
+      "Uses correct PPE for electrical work",
+      "Identifies and manages electrical hazards",
+      "Works in compliance with IE Rules and IS standards",
+      "Reports unsafe conditions to appropriate authority"
+    ],
+    "keywords": ["safety", "PPE", "regulations", "compliance", "IE rules", "hazard", "risk", "protective equipment", "accident prevention"]
+  },
+  {
+    "id": "DEMO_NOS_010",
+    "code": "DEMO_NOS_010",
+    "title": "Inspect and Test Completed Electrical Installations",
+    "description": "Ability to carry out inspection and testing of completed electrical installations before energisation.",
+    "mandatory": false,
+    "weight": 0.8,
+    "trade": "electrician",
+    "source_type": "DEMO",
+    "performance_criteria": [
+      "Carries out visual inspection of completed installation",
+      "Performs continuity tests on protective conductors",
+      "Performs insulation resistance tests",
+      "Issues test completion record and certificate"
+    ],
+    "keywords": ["inspection", "testing", "commissioning", "insulation test", "continuity test", "certification", "completion", "energisation"]
+  }
+]
