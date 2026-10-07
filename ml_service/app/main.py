@@ -15,6 +15,11 @@ from app.api.competency import router as competency_router
 from app.api.evidence import router as evidence_router
 from app.api.assessment import router as assessment_router
 from app.api.pipeline import router as pipeline_router
+from app.api.skill_gap import router as skill_gap_router
+from app.api.abstention import router as abstention_router
+from app.api.calibration import router as calibration_router
+from app.api.certification import router as certification_router
+from app.api.explainability import router as explainability_router
 
 # ---------------------------------------------------------------------------
 # App instance
@@ -24,10 +29,26 @@ app = FastAPI(
     title="KaushalTwin ML Service",
     description=(
         "AI/ML intelligence layer for the KaushalTwin RPL platform.\n\n"
-        "Provides skill extraction, NOS mapping, competency scoring, "
-        "evidence analysis, and adaptive task selection for the first 5 modules.\n\n"
-        "**IMPORTANT**: This service assists human assessors. "
-        "It never certifies a worker and never produces final Commit/Abstain decisions."
+        "Provides:\n"
+        "- transcript preprocessing\n"
+        "- skill extraction\n"
+        "- NOS mapping\n"
+        "- Competency Twin scoring\n"
+        "- evidence analysis and integrity\n"
+        "- adaptive assessment task selection\n"
+        "- skill-gap and evidence-debt analysis\n"
+        "- evidence sufficiency and abstention recommendations\n"
+        "- assessor calibration and consistency analysis\n"
+        "- competency profiling\n"
+        "- certification recommendations\n"
+        "- explainability and audit trails\n"
+        "- assessor-facing decision reports\n\n"
+        "IMPORTANT:\n"
+        "This service assists human assessors.\n"
+        "It never independently certifies a worker.\n"
+        "It never makes the final assessor decision.\n"
+        "Abstention and certification outputs are AI recommendations only.\n"
+        "The human assessor retains final authority.\n"
     ),
     version="0.1.0",
     contact={"name": "KaushalTwin Team", "email": "team@kaushaltwin.example"},
@@ -75,6 +96,11 @@ app.include_router(competency_router, prefix=PREFIX)
 app.include_router(evidence_router,   prefix=PREFIX)
 app.include_router(assessment_router, prefix=PREFIX)
 app.include_router(pipeline_router,   prefix=PREFIX)
+app.include_router(skill_gap_router,  prefix=PREFIX)
+app.include_router(abstention_router, prefix=PREFIX)
+app.include_router(calibration_router, prefix=PREFIX)
+app.include_router(certification_router, prefix=PREFIX)
+app.include_router(explainability_router, prefix=PREFIX)
 
 # ---------------------------------------------------------------------------
 # Health check
