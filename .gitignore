@@ -1,21 +1,125 @@
-# Python
-__pycache__/
-*.py[cod]
-
-# Virtual Environment
-.env
-.venv/
-env/
-venv/
-ENV/
-
-# IDE
+# ==============================================================================
+# OS and Editor/IDE Files
+# ==============================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+*.bak
 
-# OS
-.DS_Store
-Thumbs.db
+# ==============================================================================
+# Python / FastAPI
+# ==============================================================================
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.cache
+.tox/
+.nox/
+
+# Virtual Environments
+.env
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Packaging / Distribution
+dist/
+build/
+*.egg-info/
+.eggs/
+eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.manifest
+*.spec
+
+# ==============================================================================
+# Machine Learning / AI
+# ==============================================================================
+# Checkpoints and models (uncomment if you want to track specific lightweight models)
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.h5
+*.pb
+*.tflite
+*.mlmodel
+
+# Datasets and outputs
+data/raw/
+data/processed/
+*.csv
+*.tsv
+*.dat
+*.out
+*.log
+!demo_*.json
+!demo_*.csv
+!app/data/demo_*.json
+
+# Jupyter
+.ipynb_checkpoints/
+
+# ==============================================================================
+# Frontend (Node / React / Vue, etc.)
+# ==============================================================================
+node_modules/
+dist/
+build/
+.npm/
+.eslintcache
+.stylelintcache
+.next/
+.nuxt/
+out/
+coverage/
+
+# ==============================================================================
+# Local Secrets and Config
+# ==============================================================================
+# Keep templates tracked, ignore actual secrets
+*.pem
+*.key
+*.cert
+*.crt
+# Ignore all .env files except .env.example
+.env*
+!.env.example
+!.env.template
+secret*
+
+# ==============================================================================
+# Logs and Local Databases
+# ==============================================================================
+*.log
+*.sqlite3
+*.db
+!demo.sqlite3
