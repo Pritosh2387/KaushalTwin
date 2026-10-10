@@ -1,0 +1,51 @@
+"""
+KaushalTwin Backend — Pydantic Schemas: Worker
+"""
+
+from __future__ import annotations
+
+import uuid
+from datetime import datetime
+from typing import Optional
+
+from pydantic import BaseModel, Field
+
+
+class WorkerCreateRequest(BaseModel):
+    full_name: str = Field(..., min_length=1, max_length=255)
+    trade: str = Field(..., min_length=1, max_length=255)
+    years_of_experience: int = Field(0, ge=0, le=70)
+    experience_summary: Optional[str] = None
+    education_summary: Optional[str] = None
+    user_id: Optional[uuid.UUID] = None  # Link to existing user account
+
+
+class WorkerUpdateRequest(BaseModel):
+    full_name: Optional[str] = Field(None, min_length=1, max_length=255)
+    trade: Optional[str] = Field(None, min_length=1, max_length=255)
+    years_of_experience: Optional[int] = Field(None, ge=0, le=70)
+    experience_summary: Optional[str] = None
+    education_summary: Optional[str] = None
+
+
+class WorkerResponse(BaseModel):
+    id: uuid.UUID
+    full_name: str
+    trade: str
+    years_of_experience: int
+    experience_summary: Optional[str]
+    education_summary: Optional[str]
+    assessment_status: str
+    user_id: Optional[uuid.UUID]
+    registered_by_id: Optional[uuid.UUID]
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class WorkerListResponse(BaseModel):
+    items: list[WorkerResponse]
+    total: int
+    skip: int
+    limit: int
