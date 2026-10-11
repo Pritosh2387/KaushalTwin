@@ -52,3 +52,10 @@ class EvidenceResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class EvidenceListResponse(BaseModel):
+    items: list[EvidenceResponse]
+    total: int
+    skip: int
+    limit: int

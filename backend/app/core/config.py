@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     DEBUG: bool = False
 
     # ── Database ─────────────────────────────────────────────────────────────
+    MONGODB_URL: str = "mongodb://localhost:27017"
+    MONGODB_DB_NAME: str = "kaushaltwin"
     DATABASE_URL: str = "sqlite+aiosqlite:///./kaushaltwin_dev.db"
 
     # ── Security ─────────────────────────────────────────────────────────────

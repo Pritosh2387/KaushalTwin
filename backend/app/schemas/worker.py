@@ -49,3 +49,15 @@ class WorkerListResponse(BaseModel):
     total: int
     skip: int
     limit: int
+
+
+class WorkerCompetencyProfileResponse(BaseModel):
+    worker_id: uuid.UUID
+    trade: str
+    assessment_status: str
+    latest_ai_run_id: Optional[uuid.UUID] = None
+    competencies: list[dict] = []
+    summary: Optional[dict] = None
+    skills_extracted: list[dict] = []
+    nos_candidates: list[dict] = []
+    has_profile: bool = False

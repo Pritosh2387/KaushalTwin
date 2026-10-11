@@ -10,11 +10,8 @@ from __future__ import annotations
 
 import uuid
 import logging
-from datetime import timedelta
-
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.config import settings
 from app.core.dependencies import get_db, get_current_active_user
@@ -35,15 +32,11 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 )
 async def register(
     body: RegisterRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
 ) -> UserResponse:
     """
-    Create a new user account.
-
-    Note: In production, restrict this endpoint to ADMIN-only access or
-    replace with an invite-based flow.
+    Create a new user account in MongoDB.
     """
-    # Validate role
     try:
         role = UserRole(body.role.upper())
     except ValueError:
@@ -52,11 +45,8 @@ async def register(
             detail=f"Invalid role: {body.role}. Must be WORKER, ASSESSOR, or ADMIN.",
         )
 
-    # Check for existing email
-    result = await db.execute(
-        select(User).where(User.email == body.email.lower())
-    )
-    if result.scalar_one_or_none():
+    existing = await db.users.find_one({"email": body.email.lower()})
+    if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Email already registered",
@@ -70,8 +60,8 @@ async def register(
         role=role,
         is_active=True,
     )
-    db.add(user)
-    await db.flush()  # get the ID without committing
+    user_doc = user.to_mongo()
+    await db.users.insert_one(user_doc)
 
     await audit_service.record_event(
         db,
@@ -94,29 +84,26 @@ async def register(
 )
 async def login(
     body: LoginRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
 ) -> TokenResponse:
     """Authenticate with email + password and receive a JWT bearer token."""
-    result = await db.execute(
-        select(User).where(User.email == body.email.lower())
-    )
-    user: User | None = result.scalar_one_or_none()
+    user_doc = await db.users.find_one({"email": body.email.lower()})
 
-    if not user or not verify_password(body.password, user.hashed_password):
+    if not user_doc or not verify_password(body.password, user_doc["hashed_password"]):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    if not user.is_active:
+    if not user_doc.get("is_active", True):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account is inactive",
         )
 
-    token = create_access_token(str(user.id))
-    logger.info("User logged in: %s", user.email)
+    token = create_access_token(str(user_doc["id"]))
+    logger.info("User logged in: %s", user_doc["email"])
 
     return TokenResponse(
         access_token=token,

@@ -6,6 +6,7 @@ POST   /api/v1/evidence/upload/{worker_id}        — Upload evidence file
 GET    /api/v1/evidence/{evidence_id}             — Get evidence record
 PATCH  /api/v1/evidence/{evidence_id}             — Update evidence metadata
 POST   /api/v1/evidence/{evidence_id}/verify      — Verify or reject evidence (assessors)
+GET    /api/v1/evidence/{evidence_id}/download    — Download evidence file
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ from __future__ import annotations
 import json
 import uuid
 import logging
+from datetime import datetime, timezone
 
 from fastapi import (
     APIRouter,
@@ -23,8 +25,8 @@ from fastapi import (
     UploadFile,
     status,
 )
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi.responses import FileResponse
+from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.dependencies import get_db, get_current_active_user, require_assessor
 from app.db.models.user import User, UserRole
@@ -40,6 +42,7 @@ from app.schemas.evidence import (
     EvidenceUpdateRequest,
     EvidenceVerifyRequest,
     EvidenceResponse,
+    EvidenceListResponse,
 )
 from app.services import audit_service, storage_service
 
@@ -54,6 +57,34 @@ def _assert_evidence_access(record: EvidenceRecord, current_user: User) -> None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
 
+@router.get(
+    "",
+    response_model=EvidenceListResponse,
+    summary="List all evidence records with optional filtering",
+)
+async def list_evidence(
+    skip: int = 0,
+    limit: int = 50,
+    verification_status: str = None,
+    worker_id: uuid.UUID = None,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> EvidenceListResponse:
+    query = {}
+    if current_user.role == UserRole.WORKER:
+        query["uploaded_by_id"] = str(current_user.id)
+    if verification_status:
+        query["verification_status"] = verification_status
+    if worker_id:
+        query["worker_id"] = str(worker_id)
+
+    total = await db.evidence.count_documents(query)
+    cursor = db.evidence.find(query).skip(skip).limit(limit).sort("created_at", -1)
+    docs = await cursor.to_list(length=limit)
+    items = [EvidenceResponse.model_validate(EvidenceRecord.from_mongo(d)) for d in docs]
+    return EvidenceListResponse(items=items, total=total, skip=skip, limit=limit)
+
+
 @router.post(
     "",
     response_model=EvidenceResponse,
@@ -62,27 +93,17 @@ def _assert_evidence_access(record: EvidenceRecord, current_user: User) -> None:
 )
 async def create_evidence(
     body: EvidenceCreateRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> EvidenceResponse:
-    """
-    Submit evidence metadata.
-    File upload is a separate step via /evidence/upload/{worker_id}.
-    Uploaded evidence starts as UNVERIFIED — verification is a separate action.
-    """
-    # Validate worker exists
-    result = await db.execute(
-        select(WorkerProfile).where(WorkerProfile.id == body.worker_id)
-    )
-    worker = result.scalar_one_or_none()
-    if not worker:
+    worker_doc = await db.workers.find_one({"id": str(body.worker_id)})
+    if not worker_doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Worker not found")
 
-    # Workers can only submit their own evidence
+    worker = WorkerProfile.from_mongo(worker_doc)
     if current_user.role == UserRole.WORKER and worker.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
-    # Validate enums
     try:
         ev_type = EvidenceType(body.evidence_type)
         src_type = EvidenceSourceType(body.source_type)
@@ -94,15 +115,15 @@ async def create_evidence(
         worker_id=body.worker_id,
         assessment_id=body.assessment_id,
         uploaded_by_id=current_user.id,
-        evidence_type=ev_type,
-        source_type=src_type,
+        evidence_type=ev_type.value,
+        source_type=src_type.value,
         description=body.description,
         nos_id=body.nos_id,
-        verification_status=EvidenceVerificationStatus.UNVERIFIED,
+        verification_status=EvidenceVerificationStatus.UNVERIFIED.value,
         metadata_json=json.dumps(body.metadata_json) if body.metadata_json else None,
     )
-    db.add(record)
-    await db.flush()
+    doc = record.to_mongo()
+    await db.evidence.insert_one(doc)
 
     await audit_service.record_event(
         db,
@@ -130,21 +151,14 @@ async def upload_evidence_file(
     source_type: str = Form("SELF"),
     description: str = Form(...),
     nos_id: str = Form(None),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> EvidenceResponse:
-    """
-    Upload a file and create the corresponding evidence metadata record.
-    Files are stored server-side with UUID names.
-    Evidence starts as UNVERIFIED.
-    """
-    result = await db.execute(
-        select(WorkerProfile).where(WorkerProfile.id == worker_id)
-    )
-    worker = result.scalar_one_or_none()
-    if not worker:
+    worker_doc = await db.workers.find_one({"id": str(worker_id)})
+    if not worker_doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Worker not found")
 
+    worker = WorkerProfile.from_mongo(worker_doc)
     if current_user.role == UserRole.WORKER and worker.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
@@ -160,8 +174,8 @@ async def upload_evidence_file(
         id=uuid.uuid4(),
         worker_id=worker_id,
         uploaded_by_id=current_user.id,
-        evidence_type=ev_type,
-        source_type=src_type,
+        evidence_type=ev_type.value,
+        source_type=src_type.value,
         description=description,
         nos_id=nos_id or None,
         file_path=saved["file_path"],
@@ -169,10 +183,10 @@ async def upload_evidence_file(
         file_size_bytes=saved["file_size_bytes"],
         mime_type=saved["mime_type"],
         content_hash=saved["content_hash"],
-        verification_status=EvidenceVerificationStatus.UNVERIFIED,
+        verification_status=EvidenceVerificationStatus.UNVERIFIED.value,
     )
-    db.add(record)
-    await db.flush()
+    doc = record.to_mongo()
+    await db.evidence.insert_one(doc)
 
     await audit_service.record_event(
         db,
@@ -194,16 +208,14 @@ async def upload_evidence_file(
 )
 async def get_evidence(
     evidence_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> EvidenceResponse:
-    result = await db.execute(
-        select(EvidenceRecord).where(EvidenceRecord.id == evidence_id)
-    )
-    record: EvidenceRecord | None = result.scalar_one_or_none()
-    if not record:
+    doc = await db.evidence.find_one({"id": str(evidence_id)})
+    if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evidence not found")
 
+    record = EvidenceRecord.from_mongo(doc)
     _assert_evidence_access(record, current_user)
     return EvidenceResponse.model_validate(record)
 
@@ -216,29 +228,28 @@ async def get_evidence(
 async def update_evidence(
     evidence_id: uuid.UUID,
     body: EvidenceUpdateRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> EvidenceResponse:
-    result = await db.execute(
-        select(EvidenceRecord).where(EvidenceRecord.id == evidence_id)
-    )
-    record: EvidenceRecord | None = result.scalar_one_or_none()
-    if not record:
+    doc = await db.evidence.find_one({"id": str(evidence_id)})
+    if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evidence not found")
 
+    record = EvidenceRecord.from_mongo(doc)
     _assert_evidence_access(record, current_user)
 
-    # Only allow update if UNVERIFIED
-    if record.verification_status != EvidenceVerificationStatus.UNVERIFIED:
+    if record.verification_status != EvidenceVerificationStatus.UNVERIFIED.value:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Cannot update verified or rejected evidence",
         )
 
-    for field, value in body.model_dump(exclude_unset=True).items():
-        setattr(record, field, value)
+    update_data = body.model_dump(exclude_unset=True)
+    update_data["updated_at"] = datetime.now(timezone.utc)
+    await db.evidence.update_one({"id": str(evidence_id)}, {"$set": update_data})
 
-    return EvidenceResponse.model_validate(record)
+    updated_doc = await db.evidence.find_one({"id": str(evidence_id)})
+    return EvidenceResponse.model_validate(EvidenceRecord.from_mongo(updated_doc))
 
 
 @router.post(
@@ -249,19 +260,14 @@ async def update_evidence(
 async def verify_evidence(
     evidence_id: uuid.UUID,
     body: EvidenceVerifyRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
     current_user: User = Depends(require_assessor),
 ) -> EvidenceResponse:
-    """
-    Assessors can mark evidence as VERIFIED, REJECTED, or PENDING_REVIEW.
-    This is an explicit assessor action — never automatic.
-    """
-    result = await db.execute(
-        select(EvidenceRecord).where(EvidenceRecord.id == evidence_id)
-    )
-    record: EvidenceRecord | None = result.scalar_one_or_none()
-    if not record:
+    doc = await db.evidence.find_one({"id": str(evidence_id)})
+    if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evidence not found")
+
+    record = EvidenceRecord.from_mongo(doc)
 
     try:
         new_status = EvidenceVerificationStatus(body.verification_status)
@@ -271,9 +277,14 @@ async def verify_evidence(
             detail=f"Invalid status: {body.verification_status}",
         )
 
-    record.verification_status = new_status
-    record.verified_by_id = current_user.id
-    record.verification_notes = body.verification_notes
+    update_data = {
+        "verification_status": new_status.value,
+        "verified_by_id": str(current_user.id),
+        "verification_notes": body.verification_notes,
+        "updated_at": datetime.now(timezone.utc),
+    }
+    await db.evidence.update_one({"id": str(evidence_id)}, {"$set": update_data})
+    updated_doc = await db.evidence.find_one({"id": str(evidence_id)})
 
     await audit_service.record_event(
         db,
@@ -285,4 +296,34 @@ async def verify_evidence(
         metadata={"new_status": new_status.value},
     )
 
-    return EvidenceResponse.model_validate(record)
+    return EvidenceResponse.model_validate(EvidenceRecord.from_mongo(updated_doc))
+
+
+@router.get(
+    "/{evidence_id}/download",
+    summary="Download an evidence file",
+)
+async def download_evidence_file(
+    evidence_id: uuid.UUID,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    doc = await db.evidence.find_one({"id": str(evidence_id)})
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evidence not found")
+
+    record = EvidenceRecord.from_mongo(doc)
+    _assert_evidence_access(record, current_user)
+
+    if not record.file_path:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No file associated with this evidence record",
+        )
+
+    file_path = storage_service.get_file_path(record.file_path)
+    return FileResponse(
+        path=str(file_path),
+        filename=record.file_name or file_path.name,
+        media_type=record.mime_type or "application/octet-stream",
+    )

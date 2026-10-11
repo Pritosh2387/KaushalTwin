@@ -13,6 +13,7 @@ POST   /api/v1/assessments/{id}/tasks/{task_id}/result        — Submit task re
 POST   /api/v1/assessments/{id}/analyze                       — Run ML pipeline
 GET    /api/v1/assessments/{id}/ai-results                    — Get all AI runs
 POST   /api/v1/assessments/{id}/recommend-next-task           — AI next-best-task
+POST   /api/v1/assessments/{id}/check-evidence                — Check evidence sufficiency
 GET    /api/v1/assessments/{id}/recommendation                — Get latest AI recommendation
 POST   /api/v1/assessments/{id}/decision                      — Assessor final decision
 GET    /api/v1/assessments/{id}/report                        — Structured JSON report
@@ -27,8 +28,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
+from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.dependencies import get_db, get_current_active_user, require_assessor
 from app.db.models.user import User, UserRole
@@ -65,6 +65,8 @@ from app.services import audit_service
 from app.services.ml_client import (
     run_pipeline,
     get_next_task as ml_get_next_task,
+    check_abstention as ml_check_abstention,
+    analyze_evidence as ml_analyze_evidence,
     MLServiceError,
 )
 
@@ -77,15 +79,12 @@ router = APIRouter(prefix="/assessments", tags=["Assessments"])
 # ---------------------------------------------------------------------------
 
 async def _get_assessment_or_404(
-    assessment_id: uuid.UUID, db: AsyncSession
+    assessment_id: uuid.UUID, db: AsyncIOMotorDatabase
 ) -> Assessment:
-    result = await db.execute(
-        select(Assessment).where(Assessment.id == assessment_id)
-    )
-    assessment = result.scalar_one_or_none()
-    if not assessment:
+    doc = await db.assessments.find_one({"id": str(assessment_id)})
+    if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found")
-    return assessment
+    return Assessment.from_mongo(doc)
 
 
 def _assert_assessor_owns(assessment: Assessment, current_user: User) -> None:
@@ -99,7 +98,6 @@ def _assert_assessor_owns(assessment: Assessment, current_user: User) -> None:
 def _assert_can_view(assessment: Assessment, current_user: User, worker: Optional[WorkerProfile] = None) -> None:
     if current_user.role in (UserRole.ADMIN, UserRole.ASSESSOR):
         return
-    # Worker role: only own assessments
     if worker and worker.user_id == current_user.id:
         return
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
@@ -117,14 +115,11 @@ def _assert_can_view(assessment: Assessment, current_user: User, worker: Optiona
 )
 async def create_assessment(
     body: AssessmentCreateRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
     current_user: User = Depends(require_assessor),
 ) -> AssessmentResponse:
-    # Validate worker exists
-    result = await db.execute(
-        select(WorkerProfile).where(WorkerProfile.id == body.worker_id)
-    )
-    if not result.scalar_one_or_none():
+    worker_doc = await db.workers.find_one({"id": str(body.worker_id)})
+    if not worker_doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Worker not found")
 
     assessment = Assessment(
@@ -133,10 +128,10 @@ async def create_assessment(
         assessor_id=current_user.id,
         trade=body.trade,
         notes=body.notes,
-        status=AssessmentLifecycle.DRAFT,
+        status="DRAFT",
     )
-    db.add(assessment)
-    await db.flush()
+    doc = assessment.to_mongo()
+    await db.assessments.insert_one(doc)
 
     await audit_service.record_event(
         db,
@@ -160,26 +155,23 @@ async def list_assessments(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     status_filter: Optional[str] = Query(None, alias="status"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
     current_user: User = Depends(require_assessor),
 ) -> AssessmentListResponse:
-    query = select(Assessment)
+    query: dict = {}
     if current_user.role == UserRole.ASSESSOR:
-        query = query.where(Assessment.assessor_id == current_user.id)
+        query["assessor_id"] = str(current_user.id)
     if status_filter:
-        try:
-            lc = AssessmentLifecycle(status_filter.upper())
-            query = query.where(Assessment.status == lc)
-        except ValueError:
-            pass
+        query["status"] = status_filter.upper()
 
-    count_result = await db.execute(select(func.count()).select_from(query.subquery()))
-    total = count_result.scalar_one()
-    result = await db.execute(query.offset(skip).limit(limit))
-    assessments = result.scalars().all()
+    total = await db.assessments.count_documents(query)
+    cursor = db.assessments.find(query).skip(skip).limit(limit)
+    items = []
+    async for doc in cursor:
+        items.append(AssessmentResponse.model_validate(Assessment.from_mongo(doc)))
 
     return AssessmentListResponse(
-        items=[AssessmentResponse.model_validate(a) for a in assessments],
+        items=items,
         total=total,
         skip=skip,
         limit=limit,
@@ -193,11 +185,13 @@ async def list_assessments(
 )
 async def get_assessment(
     assessment_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> AssessmentResponse:
     assessment = await _get_assessment_or_404(assessment_id, db)
-    _assert_can_view(assessment, current_user)
+    worker_doc = await db.workers.find_one({"id": str(assessment.worker_id)})
+    worker = WorkerProfile.from_mongo(worker_doc) if worker_doc else None
+    _assert_can_view(assessment, current_user, worker)
     return AssessmentResponse.model_validate(assessment)
 
 
@@ -209,16 +203,18 @@ async def get_assessment(
 async def update_assessment(
     assessment_id: uuid.UUID,
     body: AssessmentUpdateRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
     current_user: User = Depends(require_assessor),
 ) -> AssessmentResponse:
     assessment = await _get_assessment_or_404(assessment_id, db)
     _assert_assessor_owns(assessment, current_user)
 
-    for field, value in body.model_dump(exclude_unset=True).items():
-        setattr(assessment, field, value)
+    update_data = body.model_dump(exclude_unset=True)
+    update_data["updated_at"] = datetime.now(timezone.utc)
+    await db.assessments.update_one({"id": str(assessment_id)}, {"$set": update_data})
 
-    return AssessmentResponse.model_validate(assessment)
+    updated_doc = await db.assessments.find_one({"id": str(assessment_id)})
+    return AssessmentResponse.model_validate(Assessment.from_mongo(updated_doc))
 
 
 @router.post(
@@ -228,65 +224,75 @@ async def update_assessment(
 )
 async def start_assessment(
     assessment_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
     current_user: User = Depends(require_assessor),
 ) -> AssessmentResponse:
     assessment = await _get_assessment_or_404(assessment_id, db)
     _assert_assessor_owns(assessment, current_user)
 
-    if assessment.status != AssessmentLifecycle.DRAFT:
+    status_str = assessment.status if isinstance(assessment.status, str) else assessment.status.value
+    if status_str != "DRAFT":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Assessment is {assessment.status.value}, not DRAFT",
+            detail=f"Assessment is {status_str}, not DRAFT",
         )
 
-    assessment.status = AssessmentLifecycle.IN_PROGRESS
-    assessment.started_at = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc)
+    await db.assessments.update_one(
+        {"id": str(assessment_id)},
+        {"$set": {"status": "IN_PROGRESS", "started_at": now, "updated_at": now}},
+    )
 
     await audit_service.record_event(
         db,
         action="ASSESSMENT_STARTED",
         entity_type="Assessment",
-        entity_id=str(assessment.id),
+        entity_id=str(assessment_id),
         actor_user_id=current_user.id,
         actor_label=current_user.email,
     )
 
-    return AssessmentResponse.model_validate(assessment)
+    updated_doc = await db.assessments.find_one({"id": str(assessment_id)})
+    return AssessmentResponse.model_validate(Assessment.from_mongo(updated_doc))
 
 
 @router.post(
     "/{assessment_id}/complete",
     response_model=AssessmentResponse,
-    summary="Mark assessment ready for review (IN_PROGRESS → READY_FOR_REVIEW)",
+    summary="Mark assessment ready for assessor review (IN_PROGRESS → READY_FOR_REVIEW)",
 )
 async def complete_assessment(
     assessment_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
     current_user: User = Depends(require_assessor),
 ) -> AssessmentResponse:
     assessment = await _get_assessment_or_404(assessment_id, db)
     _assert_assessor_owns(assessment, current_user)
 
-    if assessment.status != AssessmentLifecycle.IN_PROGRESS:
+    status_str = assessment.status if isinstance(assessment.status, str) else assessment.status.value
+    if status_str != "IN_PROGRESS":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Assessment must be IN_PROGRESS to mark complete",
+            detail=f"Assessment must be IN_PROGRESS to complete; currently {status_str}",
         )
 
-    assessment.status = AssessmentLifecycle.READY_FOR_REVIEW
-    assessment.completed_at = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc)
+    await db.assessments.update_one(
+        {"id": str(assessment_id)},
+        {"$set": {"status": "READY_FOR_REVIEW", "completed_at": now, "updated_at": now}},
+    )
 
     await audit_service.record_event(
         db,
-        action="ASSESSMENT_READY_FOR_REVIEW",
+        action="ASSESSMENT_COMPLETED",
         entity_type="Assessment",
-        entity_id=str(assessment.id),
+        entity_id=str(assessment_id),
         actor_user_id=current_user.id,
         actor_label=current_user.email,
     )
 
-    return AssessmentResponse.model_validate(assessment)
+    updated_doc = await db.assessments.find_one({"id": str(assessment_id)})
+    return AssessmentResponse.model_validate(Assessment.from_mongo(updated_doc))
 
 
 # ---------------------------------------------------------------------------
@@ -297,39 +303,39 @@ async def complete_assessment(
     "/{assessment_id}/tasks",
     response_model=TaskResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Add a task to an assessment (assessor-assigned)",
+    summary="Add an evaluation task to an assessment",
 )
 async def create_task(
     assessment_id: uuid.UUID,
     body: TaskCreateRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
     current_user: User = Depends(require_assessor),
 ) -> TaskResponse:
     assessment = await _get_assessment_or_404(assessment_id, db)
     _assert_assessor_owns(assessment, current_user)
 
-    try:
-        src = TaskSelectionSource(body.selection_source.upper())
-    except ValueError:
-        src = TaskSelectionSource.ASSESSOR_ASSIGNED
-
     task = AssessmentTask(
         id=uuid.uuid4(),
         assessment_id=assessment_id,
-        assessor_id=current_user.id,
         title=body.title,
         description=body.description,
         target_nos_id=body.target_nos_id,
-        selection_source=src,
-        evaluation_criteria=(
-            json.dumps(body.evaluation_criteria)
-            if body.evaluation_criteria is not None
-            else None
-        ),
-        status=TaskStatus.PENDING,
+        selection_source=body.selection_source,
+        evaluation_criteria=json.dumps(body.evaluation_criteria) if body.evaluation_criteria else None,
+        status="PENDING",
     )
-    db.add(task)
-    await db.flush()
+    doc = task.to_mongo()
+    await db.assessment_tasks.insert_one(doc)
+
+    await audit_service.record_event(
+        db,
+        action="TASK_CREATED",
+        entity_type="AssessmentTask",
+        entity_id=str(task.id),
+        actor_user_id=current_user.id,
+        actor_label=current_user.email,
+        metadata={"title": task.title, "source": body.selection_source},
+    )
 
     return TaskResponse.model_validate(task)
 
@@ -337,185 +343,217 @@ async def create_task(
 @router.get(
     "/{assessment_id}/tasks",
     response_model=list[TaskResponse],
-    summary="List tasks for an assessment",
+    summary="List all evaluation tasks for an assessment",
 )
 async def list_tasks(
     assessment_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> list[TaskResponse]:
     assessment = await _get_assessment_or_404(assessment_id, db)
-    _assert_can_view(assessment, current_user)
+    worker_doc = await db.workers.find_one({"id": str(assessment.worker_id)})
+    worker = WorkerProfile.from_mongo(worker_doc) if worker_doc else None
+    _assert_can_view(assessment, current_user, worker)
 
-    result = await db.execute(
-        select(AssessmentTask).where(AssessmentTask.assessment_id == assessment_id)
-    )
-    tasks = result.scalars().all()
-    return [TaskResponse.model_validate(t) for t in tasks]
+    cursor = db.assessment_tasks.find({"assessment_id": str(assessment_id)})
+    tasks = []
+    async for doc in cursor:
+        tasks.append(TaskResponse.model_validate(AssessmentTask.from_mongo(doc)))
+    return tasks
 
 
 @router.post(
     "/{assessment_id}/tasks/{task_id}/result",
     response_model=TaskResponse,
-    summary="Submit a result for an assessment task",
+    summary="Submit evaluation result for a task",
 )
 async def submit_task_result(
     assessment_id: uuid.UUID,
     task_id: uuid.UUID,
     body: TaskResultRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
     current_user: User = Depends(require_assessor),
 ) -> TaskResponse:
     assessment = await _get_assessment_or_404(assessment_id, db)
     _assert_assessor_owns(assessment, current_user)
 
-    result = await db.execute(
-        select(AssessmentTask).where(
-            AssessmentTask.id == task_id,
-            AssessmentTask.assessment_id == assessment_id,
-        )
+    task_doc = await db.assessment_tasks.find_one(
+        {"id": str(task_id), "assessment_id": str(assessment_id)}
     )
-    task: AssessmentTask | None = result.scalar_one_or_none()
-    if not task:
+    if not task_doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
 
-    if task.status == TaskStatus.COMPLETED:
+    if task_doc.get("status") == "COMPLETED":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Task is already completed",
+            detail="Task has already been evaluated",
         )
 
-    task.score = body.score
-    task.assessor_comments = body.assessor_comments
-    task.evidence_references = (
-        json.dumps(body.evidence_references) if body.evidence_references else None
-    )
-    task.status = TaskStatus.COMPLETED
-    task.completed_at = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc)
+    ev_refs = json.dumps(body.evidence_references) if body.evidence_references else None
+    update_data = {
+        "status": "COMPLETED",
+        "score": body.score,
+        "assessor_comments": body.assessor_comments,
+        "evidence_references": ev_refs,
+        "completed_at": now,
+    }
+    await db.assessment_tasks.update_one({"id": str(task_id)}, {"$set": update_data})
 
     await audit_service.record_event(
         db,
-        action="TASK_RESULT_SUBMITTED",
+        action="TASK_EVALUATED",
         entity_type="AssessmentTask",
-        entity_id=str(task.id),
+        entity_id=str(task_id),
         actor_user_id=current_user.id,
         actor_label=current_user.email,
-        metadata={"score": body.score, "assessment_id": str(assessment_id)},
+        metadata={"score": body.score},
     )
 
-    return TaskResponse.model_validate(task)
+    updated_doc = await db.assessment_tasks.find_one({"id": str(task_id)})
+    return TaskResponse.model_validate(AssessmentTask.from_mongo(updated_doc))
 
 
 # ---------------------------------------------------------------------------
-# ML Integration
+# ML Pipeline Execution
 # ---------------------------------------------------------------------------
 
 @router.post(
     "/{assessment_id}/analyze",
     response_model=AIRunResponse,
-    summary="Run the full ML pipeline for this assessment",
+    summary="Trigger the AI assessment pipeline for this assessment",
 )
 async def analyze_assessment(
     assessment_id: uuid.UUID,
-    body: MLAnalysisRequest,
-    db: AsyncSession = Depends(get_db),
+    body: MLAnalysisRequest = MLAnalysisRequest(),
+    db: AsyncIOMotorDatabase = Depends(get_db),
     current_user: User = Depends(require_assessor),
 ) -> AIRunResponse:
     """
-    Triggers the unified ML pipeline.
-    Persists the full input snapshot and ML response.
-    Does NOT overwrite existing assessor decisions.
+    Run the unified ML pipeline in-process or over HTTP.
+    Stores the full result and recommendation.
+    Never auto-certifies: output is purely advisory.
     """
     assessment = await _get_assessment_or_404(assessment_id, db)
     _assert_assessor_owns(assessment, current_user)
 
-    # Load worker profile
-    result = await db.execute(
-        select(WorkerProfile).where(WorkerProfile.id == assessment.worker_id)
+    worker_doc = await db.workers.find_one({"id": str(assessment.worker_id)})
+    if not worker_doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Worker not found")
+    worker = WorkerProfile.from_mongo(worker_doc)
+
+    # Gather evidence
+    ev_cursor = db.evidence.find({"worker_id": str(assessment.worker_id)})
+    evidence_records = []
+    async for e in ev_cursor:
+        evidence_records.append(e)
+
+    # Gather completed tasks
+    task_cursor = db.assessment_tasks.find(
+        {"assessment_id": str(assessment_id), "status": "COMPLETED"}
     )
-    worker: WorkerProfile | None = result.scalar_one_or_none()
-    if not worker:
-        raise HTTPException(status_code=500, detail="Worker profile not found")
+    completed_tasks = []
+    async for t in task_cursor:
+        completed_tasks.append(t)
 
-    # Gather evidence for this worker
-    ev_result = await db.execute(
-        select(EvidenceRecord).where(EvidenceRecord.worker_id == assessment.worker_id)
-    )
-    evidence_records = ev_result.scalars().all()
+    # Transcript from worker summaries
+    transcript_parts = []
+    if worker.experience_summary:
+        transcript_parts.append(f"Work Experience: {worker.experience_summary}")
+    if worker.education_summary:
+        transcript_parts.append(f"Education: {worker.education_summary}")
+    for ev in evidence_records:
+        if ev.get("description"):
+            transcript_parts.append(f"Evidence ({ev.get('evidence_type')}): {ev['description']}")
+    transcript = "\n".join(transcript_parts) or f"Worker has {worker.years_of_experience} years in {worker.trade}."
 
-    # Build transcript from worker profile
-    transcript = (
-        f"{worker.experience_summary or ''} "
-        f"{worker.education_summary or ''}"
-    ).strip() or f"Worker in {worker.trade} with {worker.years_of_experience} years experience"
-
-    # Build evidence list for ML (use metadata only)
-    ml_evidence = [
+    # Evidence payload
+    evidence_payload = [
         {
-            "source": rec.source_type.value,
-            "supports": rec.verification_status.value == "VERIFIED",
-            "notes": rec.description,
+            "evidence_id": str(e["id"]),
+            "type": e.get("evidence_type", "OTHER"),
+            "source": e.get("source_type", "SELF"),
+            "description": e.get("description", ""),
+            "nos_id": e.get("nos_id"),
+            "verified": e.get("verification_status") == "VERIFIED",
         }
-        for rec in evidence_records
+        for e in evidence_records
     ]
 
-    # Safe input snapshot (no secrets)
-    input_snapshot = {
-        "worker_id": str(worker.id),
-        "trade": assessment.trade,
-        "language": body.language,
-        "evidence_count": len(ml_evidence),
-        "include_calibration": body.include_calibration,
-    }
+    # Task scores
+    assessor_scores = [
+        {
+            "task_id": str(t["id"]),
+            "nos_id": t.get("target_nos_id") or "GENERAL",
+            "score": t.get("score", 0.0),
+        }
+        for t in completed_tasks
+    ]
 
-    # Create a pending AI run record
+    # Create AI run record in PENDING status
     ai_run = AIAssessmentRun(
         id=uuid.uuid4(),
-        worker_id=assessment.worker_id,
         assessment_id=assessment_id,
-        triggered_by_id=current_user.id,
-        run_status=RunStatus.RUNNING,
-        input_snapshot_json=json.dumps(input_snapshot, default=str),
+        worker_id=assessment.worker_id,
+        run_status="RUNNING",
     )
-    db.add(ai_run)
-    await db.flush()
+    await db.ai_runs.insert_one(ai_run.to_mongo())
 
-    # Call the ML service
     try:
-        ml_response = await run_pipeline(
-            worker_id=str(worker.id),
+        pipeline_result = await run_pipeline(
+            worker_id=str(assessment.worker_id),
             transcript=transcript,
             language=body.language,
-            trade=assessment.trade,
-            evidence=ml_evidence,
+            trade=worker.trade,
+            evidence=evidence_payload,
+            assessor_scores=assessor_scores,
             claim=body.claim_for_explanation,
         )
-        ai_run.ml_response_json = json.dumps(ml_response, default=str)
-        ai_run.run_status = RunStatus.COMPLETED
 
-        # Denormalize top-level recommendation
-        cert = ml_response.get("certification_recommendation") or {}
-        ai_run.recommendation = cert.get("recommendation")
+        cert_rec = pipeline_result.get("certification_recommendation", {})
+        recommendation_str = cert_rec.get("recommendation") or "REQUIRES_ASSESSOR_REVIEW"
+
+        now = datetime.now(timezone.utc)
+        await db.ai_runs.update_one(
+            {"id": str(ai_run.id)},
+            {
+                "$set": {
+                    "run_status": "COMPLETED",
+                    "recommendation": recommendation_str,
+                    "ml_response": pipeline_result,
+                    "created_at": now,
+                }
+            },
+        )
+
+        # Transition assessment to READY_FOR_REVIEW
+        await db.assessments.update_one(
+            {"id": str(assessment_id)},
+            {"$set": {"status": "READY_FOR_REVIEW", "updated_at": now}},
+        )
 
         await audit_service.record_event(
             db,
-            action="ML_RUN_COMPLETED",
+            action="AI_ANALYSIS_COMPLETED",
             entity_type="AIAssessmentRun",
             entity_id=str(ai_run.id),
             actor_user_id=current_user.id,
             actor_label=current_user.email,
-            metadata={
-                "assessment_id": str(assessment_id),
-                "recommendation": ai_run.recommendation,
-            },
+            metadata={"recommendation": recommendation_str},
         )
 
+        updated_run = await db.ai_runs.find_one({"id": str(ai_run.id)})
+        return AIRunResponse.model_validate(AIAssessmentRun.from_mongo(updated_run))
+
     except MLServiceError as exc:
-        ai_run.run_status = RunStatus.FAILED
-        ai_run.error_detail = str(exc)
+        now = datetime.now(timezone.utc)
+        await db.ai_runs.update_one(
+            {"id": str(ai_run.id)},
+            {"$set": {"run_status": "FAILED", "error_detail": str(exc), "created_at": now}},
+        )
         await audit_service.record_event(
             db,
-            action="ML_RUN_FAILED",
+            action="AI_ANALYSIS_FAILED",
             entity_type="AIAssessmentRun",
             entity_id=str(ai_run.id),
             actor_user_id=current_user.id,
@@ -527,91 +565,52 @@ async def analyze_assessment(
             detail=f"ML service error: {exc}",
         )
 
-    return AIRunResponse(
-        id=ai_run.id,
-        assessment_id=ai_run.assessment_id,
-        worker_id=ai_run.worker_id,
-        run_status=ai_run.run_status.value,
-        recommendation=ai_run.recommendation,
-        ml_response=json.loads(ai_run.ml_response_json) if ai_run.ml_response_json else None,
-        error_detail=ai_run.error_detail,
-        created_at=ai_run.created_at,
-    )
-
 
 @router.get(
     "/{assessment_id}/ai-results",
     response_model=list[AIRunResponse],
-    summary="Get all AI analysis runs for this assessment",
+    summary="Get all AI assessment runs for an assessment",
 )
 async def get_ai_results(
     assessment_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> list[AIRunResponse]:
     assessment = await _get_assessment_or_404(assessment_id, db)
-    _assert_can_view(assessment, current_user)
+    worker_doc = await db.workers.find_one({"id": str(assessment.worker_id)})
+    worker = WorkerProfile.from_mongo(worker_doc) if worker_doc else None
+    _assert_can_view(assessment, current_user, worker)
 
-    result = await db.execute(
-        select(AIAssessmentRun)
-        .where(AIAssessmentRun.assessment_id == assessment_id)
-        .order_by(AIAssessmentRun.created_at.desc())
-    )
-    runs = result.scalars().all()
-
-    return [
-        AIRunResponse(
-            id=r.id,
-            assessment_id=r.assessment_id,
-            worker_id=r.worker_id,
-            run_status=r.run_status.value,
-            recommendation=r.recommendation,
-            ml_response=json.loads(r.ml_response_json) if r.ml_response_json else None,
-            error_detail=r.error_detail,
-            created_at=r.created_at,
-        )
-        for r in runs
-    ]
+    cursor = db.ai_runs.find({"assessment_id": str(assessment_id)}).sort("created_at", -1)
+    runs = []
+    async for doc in cursor:
+        runs.append(AIRunResponse.model_validate(AIAssessmentRun.from_mongo(doc)))
+    return runs
 
 
 @router.post(
     "/{assessment_id}/recommend-next-task",
     response_model=NextTaskRecommendationResponse,
-    summary="Get AI recommendation for the next assessment task",
+    summary="Get AI recommendation for the next evaluation task",
 )
 async def recommend_next_task(
     assessment_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
     current_user: User = Depends(require_assessor),
 ) -> NextTaskRecommendationResponse:
-    """
-    Calls the ML adaptive assessment module to recommend the next task.
-    The recommendation is persisted as a PENDING AI-recommended task.
-    The assessor must explicitly accept, modify, or skip it.
-    """
     assessment = await _get_assessment_or_404(assessment_id, db)
     _assert_assessor_owns(assessment, current_user)
 
-    # Get the latest completed AI run to get competency states
-    result = await db.execute(
-        select(AIAssessmentRun)
-        .where(
-            AIAssessmentRun.assessment_id == assessment_id,
-            AIAssessmentRun.run_status == RunStatus.COMPLETED,
-        )
-        .order_by(AIAssessmentRun.created_at.desc())
-        .limit(1)
+    # Get latest completed AI run to get competency states
+    latest_run = await db.ai_runs.find_one(
+        {"assessment_id": str(assessment_id), "run_status": "COMPLETED"},
+        sort=[("created_at", -1)],
     )
-    latest_run: AIAssessmentRun | None = result.scalar_one_or_none()
 
     competency_states: list[dict] = []
-    if latest_run and latest_run.ml_response_json:
-        try:
-            ml_data = json.loads(latest_run.ml_response_json)
-            twin = ml_data.get("competency_twin", {})
-            competency_states = twin.get("competencies", [])
-        except (json.JSONDecodeError, AttributeError):
-            pass
+    if latest_run and latest_run.get("ml_response"):
+        twin = latest_run["ml_response"].get("competency_twin", {})
+        competency_states = twin.get("competencies", [])
 
     if not competency_states:
         raise HTTPException(
@@ -619,151 +618,187 @@ async def recommend_next_task(
             detail="No competency data available. Run /analyze first.",
         )
 
-    # Get already-completed task IDs to exclude
-    completed_result = await db.execute(
-        select(AssessmentTask.ml_task_id)
-        .where(
-            AssessmentTask.assessment_id == assessment_id,
-            AssessmentTask.status == TaskStatus.COMPLETED,
-            AssessmentTask.ml_task_id.isnot(None),
-        )
-    )
-    completed_task_ids = [r[0] for r in completed_result.all() if r[0]]
-
-    # Create an AI run record for this next-task call
-    ai_run = AIAssessmentRun(
-        id=uuid.uuid4(),
-        worker_id=assessment.worker_id,
-        assessment_id=assessment_id,
-        triggered_by_id=current_user.id,
-        run_status=RunStatus.RUNNING,
-        input_snapshot_json=json.dumps({
-            "action": "next_task",
-            "competency_states_count": len(competency_states),
-            "excluded_tasks": completed_task_ids,
-        }),
-    )
-    db.add(ai_run)
-    await db.flush()
+    # Exclude already existing tasks
+    task_cursor = db.assessment_tasks.find({"assessment_id": str(assessment_id)})
+    existing_ml_ids = []
+    async for t in task_cursor:
+        if t.get("ml_task_id"):
+            existing_ml_ids.append(t["ml_task_id"])
 
     try:
-        ml_response = await ml_get_next_task(
+        rec_data = await ml_get_next_task(
             competency_states=competency_states,
-            exclude_task_ids=completed_task_ids,
+            exclude_task_ids=existing_ml_ids,
         )
-        ai_run.ml_response_json = json.dumps(ml_response, default=str)
-        ai_run.run_status = RunStatus.COMPLETED
-
     except MLServiceError as exc:
-        ai_run.run_status = RunStatus.FAILED
-        ai_run.error_detail = str(exc)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"ML service error: {exc}",
         )
 
-    # Persist the AI-recommended task if one was selected
-    persisted_task_id: Optional[uuid.UUID] = None
-    selected = ml_response.get("selected_task")
+    selected = rec_data.get("selected_task")
+    persisted_task_id = None
     if selected:
-        reasons_json = json.dumps(ml_response.get("reason", []))
-        task = AssessmentTask(
+        persisted_task = AssessmentTask(
             id=uuid.uuid4(),
             assessment_id=assessment_id,
-            assessor_id=current_user.id,
-            ml_task_id=selected.get("id"),
-            title=selected.get("title", "AI Recommended Task"),
+            title=selected.get("title", "Recommended Task"),
             description=selected.get("description"),
-            target_nos_id=(
-                selected.get("nos_coverage", [{}])[0].get("nos_id")
-                if selected.get("nos_coverage")
-                else None
-            ),
-            selection_source=TaskSelectionSource.AI_RECOMMENDED,
-            ai_priority_score=ml_response.get("priority_score"),
-            ai_reasons=reasons_json,
-            status=TaskStatus.PENDING,
+            target_nos_id=selected.get("nos_coverage", [{}])[0].get("nos_id") if selected.get("nos_coverage") else selected.get("nos_id"),
+            ml_task_id=selected.get("task_id") or selected.get("id"),
+            selection_source="AI_RECOMMENDED",
+            ai_priority_score=rec_data.get("priority_score"),
+            ai_reasons=json.dumps(rec_data.get("reason", [])),
+            status="PENDING",
         )
-        db.add(task)
-        await db.flush()
-        persisted_task_id = task.id
+        await db.assessment_tasks.insert_one(persisted_task.to_mongo())
+        persisted_task_id = persisted_task.id
+
+    ai_run_id = uuid.uuid4()
+    await db.ai_runs.insert_one(
+        AIAssessmentRun(
+            id=ai_run_id,
+            assessment_id=assessment_id,
+            worker_id=assessment.worker_id,
+            run_status="COMPLETED",
+            recommendation=selected.get("task_id") if selected else "NO_TASK_RECOMMENDED",
+            ml_response=rec_data,
+        ).to_mongo()
+    )
 
     return NextTaskRecommendationResponse(
-        ai_run_id=ai_run.id,
+        ai_run_id=ai_run_id,
         task_id=persisted_task_id,
         selected_task=selected,
-        priority_score=ml_response.get("priority_score", 0.0),
-        reason=ml_response.get("reason", []),
-        alternatives=ml_response.get("alternatives", []),
-        note=ml_response.get(
-            "note",
-            "Task selection is AI-assisted. Assessor must review before assigning.",
-        ),
+        priority_score=rec_data.get("priority_score", 0.0),
+        reason=rec_data.get("reason", []),
+        alternatives=rec_data.get("alternatives", []),
+        note="Advisory recommendation. Assessor decides whether to administer this task.",
     )
+
+
+@router.post(
+    "/{assessment_id}/check-evidence",
+    summary="Check evidence sufficiency and abstention recommendation",
+)
+async def check_evidence_sufficiency(
+    assessment_id: uuid.UUID,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    current_user: User = Depends(require_assessor),
+) -> dict:
+    assessment = await _get_assessment_or_404(assessment_id, db)
+    _assert_assessor_owns(assessment, current_user)
+
+    ev_cursor = db.evidence.find({"worker_id": str(assessment.worker_id)})
+    evidence_records = []
+    async for e in ev_cursor:
+        evidence_records.append({
+            "evidence_id": str(e["id"]),
+            "type": e.get("evidence_type", "OTHER"),
+            "verified": e.get("verification_status") == "VERIFIED",
+            "description": e.get("description", ""),
+        })
+
+    # Default competencies
+    competencies = [
+        {"nos_id": "DEMO_NOS_001", "name": "Basic Operations", "score": 75},
+        {"nos_id": "DEMO_NOS_002", "name": "Safety Protocols", "score": 80},
+    ]
+
+    try:
+        ev_analysis = await ml_analyze_evidence(evidence_records)
+        abs_check = await ml_check_abstention(
+            worker_id=str(assessment.worker_id),
+            competencies=competencies,
+            evidence_records=evidence_records,
+        )
+    except MLServiceError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"ML service error: {exc}",
+        )
+
+    ai_run_id = uuid.uuid4()
+    await db.ai_runs.insert_one(
+        AIAssessmentRun(
+            id=ai_run_id,
+            assessment_id=assessment_id,
+            worker_id=assessment.worker_id,
+            run_status="COMPLETED",
+            recommendation=abs_check.get("status", "ABSTAIN"),
+            ml_response={"evidence_analysis": ev_analysis, "abstention_check": abs_check},
+        ).to_mongo()
+    )
+
+    return {
+        "ai_run_id": ai_run_id,
+        "evidence_analysis": ev_analysis,
+        "abstention_check": abs_check,
+    }
 
 
 @router.get(
     "/{assessment_id}/recommendation",
-    response_model=Optional[dict],
-    summary="Get the latest AI certification recommendation",
+    summary="Get latest AI recommendation without re-running pipeline",
 )
-async def get_recommendation(
+async def get_latest_recommendation(
     assessment_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
-) -> Optional[dict]:
+) -> dict:
     assessment = await _get_assessment_or_404(assessment_id, db)
-    _assert_can_view(assessment, current_user)
+    worker_doc = await db.workers.find_one({"id": str(assessment.worker_id)})
+    worker = WorkerProfile.from_mongo(worker_doc) if worker_doc else None
+    _assert_can_view(assessment, current_user, worker)
 
-    result = await db.execute(
-        select(AIAssessmentRun)
-        .where(
-            AIAssessmentRun.assessment_id == assessment_id,
-            AIAssessmentRun.run_status == RunStatus.COMPLETED,
-        )
-        .order_by(AIAssessmentRun.created_at.desc())
-        .limit(1)
+    latest_run = await db.ai_runs.find_one(
+        {"assessment_id": str(assessment_id), "run_status": "COMPLETED"},
+        sort=[("created_at", -1)],
     )
-    run: AIAssessmentRun | None = result.scalar_one_or_none()
-    if not run:
-        return None
 
-    ml_data = json.loads(run.ml_response_json) if run.ml_response_json else {}
+    if not latest_run:
+        return {
+            "assessment_id": str(assessment_id),
+            "has_recommendation": False,
+            "message": "No completed AI analysis runs found. Trigger /analyze first.",
+            "recommendation": None,
+        }
+
+    ml_data = latest_run.get("ml_response") or {}
     return {
-        "ai_run_id": str(run.id),
-        "run_created_at": run.created_at.isoformat(),
-        "recommendation": run.recommendation,
+        "assessment_id": str(assessment_id),
+        "has_recommendation": True,
+        "ai_run_id": str(latest_run["id"]),
+        "recommendation": latest_run.get("recommendation"),
         "certification_recommendation": ml_data.get("certification_recommendation"),
         "abstention_decision": ml_data.get("abstention_decision"),
+        "skill_gap_analysis": ml_data.get("skill_gap_analysis"),
+        "analyzed_at": latest_run.get("created_at"),
         "note": "This is an AI recommendation only. The human assessor makes the final decision.",
     }
 
 
 # ---------------------------------------------------------------------------
-# Assessor Decision
+# Decision
 # ---------------------------------------------------------------------------
 
 @router.post(
     "/{assessment_id}/decision",
     response_model=DecisionResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Record the assessor's final decision (independent of AI output)",
+    summary="Record assessor final certification decision",
 )
 async def record_decision(
     assessment_id: uuid.UUID,
     body: DecisionRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
     current_user: User = Depends(require_assessor),
 ) -> DecisionResponse:
-    """
-    Record the assessor's independent final decision.
-    This record is separate from the AI run — the AI output is never overwritten.
-    """
     assessment = await _get_assessment_or_404(assessment_id, db)
     _assert_assessor_owns(assessment, current_user)
 
     try:
-        action = DecisionAction(body.action.upper())
+        action = DecisionAction(body.action)
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -775,17 +810,18 @@ async def record_decision(
         assessment_id=assessment_id,
         ai_run_id=body.ai_run_id,
         assessor_id=current_user.id,
-        action=action,
+        action=action.value,
         comments=body.comments,
         modified_recommendation=body.modified_recommendation,
     )
-    db.add(decision)
+    await db.decisions.insert_one(decision.to_mongo())
 
-    # Update assessment status if appropriate
+    now = datetime.now(timezone.utc)
     if action in (DecisionAction.ACCEPT_RECOMMENDATION, DecisionAction.MODIFY_RECOMMENDATION):
-        assessment.status = AssessmentLifecycle.REVIEWED
-
-    await db.flush()
+        await db.assessments.update_one(
+            {"id": str(assessment_id)},
+            {"$set": {"status": "REVIEWED", "updated_at": now}},
+        )
 
     await audit_service.record_event(
         db,
@@ -805,7 +841,7 @@ async def record_decision(
         id=decision.id,
         assessment_id=decision.assessment_id,
         assessor_id=decision.assessor_id,
-        action=decision.action.value,
+        action=decision.action,
         comments=decision.comments,
         modified_recommendation=decision.modified_recommendation,
         ai_run_id=decision.ai_run_id,
@@ -824,74 +860,53 @@ async def record_decision(
 )
 async def get_report(
     assessment_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> AssessmentReport:
-    """
-    Assembles a complete structured report from persisted data.
-    Does not call the ML service — uses stored AI run data only.
-    Unavailable information is explicitly marked as null/absent.
-    """
     assessment = await _get_assessment_or_404(assessment_id, db)
-    _assert_can_view(assessment, current_user)
-
-    # Worker
-    wp_result = await db.execute(
-        select(WorkerProfile).where(WorkerProfile.id == assessment.worker_id)
-    )
-    worker = wp_result.scalar_one_or_none()
+    worker_doc = await db.workers.find_one({"id": str(assessment.worker_id)})
+    worker = WorkerProfile.from_mongo(worker_doc) if worker_doc else None
+    _assert_can_view(assessment, current_user, worker)
 
     # Evidence
-    ev_result = await db.execute(
-        select(EvidenceRecord).where(EvidenceRecord.worker_id == assessment.worker_id)
-    )
-    evidence_records = ev_result.scalars().all()
+    ev_cursor = db.evidence.find({"worker_id": str(assessment.worker_id)})
+    evidence_records = []
+    async for e in ev_cursor:
+        evidence_records.append(EvidenceRecord.from_mongo(e))
 
     # Tasks
-    task_result = await db.execute(
-        select(AssessmentTask).where(AssessmentTask.assessment_id == assessment_id)
-    )
-    tasks = task_result.scalars().all()
+    task_cursor = db.assessment_tasks.find({"assessment_id": str(assessment_id)})
+    tasks = []
+    async for t in task_cursor:
+        tasks.append(AssessmentTask.from_mongo(t))
 
     # AI runs
-    run_result = await db.execute(
-        select(AIAssessmentRun)
-        .where(AIAssessmentRun.assessment_id == assessment_id)
-        .order_by(AIAssessmentRun.created_at.desc())
-    )
-    ai_runs = run_result.scalars().all()
+    run_cursor = db.ai_runs.find({"assessment_id": str(assessment_id)}).sort("created_at", -1)
+    ai_runs = []
+    async for r in run_cursor:
+        ai_runs.append(AIAssessmentRun.from_mongo(r))
 
     # Latest decision
-    dec_result = await db.execute(
-        select(AssessorDecision)
-        .where(AssessorDecision.assessment_id == assessment_id)
-        .order_by(AssessorDecision.created_at.desc())
-        .limit(1)
+    latest_decision_doc = await db.decisions.find_one(
+        {"assessment_id": str(assessment_id)},
+        sort=[("created_at", -1)],
     )
-    latest_decision = dec_result.scalar_one_or_none()
+    latest_decision = AssessorDecision.from_mongo(latest_decision_doc) if latest_decision_doc else None
 
     # Audit trail
-    audit_result = await db.execute(
-        select(AuditEvent)
-        .where(
-            AuditEvent.entity_type.in_(["Assessment", "AIAssessmentRun", "AssessmentTask"]),
-            AuditEvent.entity_id.in_(
-                [str(assessment_id)]
-                + [str(r.id) for r in ai_runs]
-                + [str(t.id) for t in tasks]
-            ),
-        )
-        .order_by(AuditEvent.created_at.asc())
-    )
-    audit_events = audit_result.scalars().all()
+    entity_ids = [str(assessment_id)] + [str(r.id) for r in ai_runs] + [str(t.id) for t in tasks]
+    audit_cursor = db.audit_events.find({
+        "entity_type": {"$in": ["Assessment", "AIAssessmentRun", "AssessmentTask"]},
+        "entity_id": {"$in": entity_ids},
+    }).sort("timestamp", 1)
+    audit_events = []
+    async for a in audit_cursor:
+        audit_events.append(a)
 
-    # Latest completed AI run for recommendation
-    latest_run = next(
-        (r for r in ai_runs if r.run_status == RunStatus.COMPLETED), None
-    )
+    latest_run = next((r for r in ai_runs if r.run_status in ("COMPLETED", "SUCCESS")), None)
     latest_rec = None
-    if latest_run and latest_run.ml_response_json:
-        ml_data = json.loads(latest_run.ml_response_json)
+    if latest_run and latest_run.ml_response:
+        ml_data = latest_run.ml_response
         latest_rec = {
             "ai_run_id": str(latest_run.id),
             "recommendation": latest_run.recommendation,
@@ -899,6 +914,8 @@ async def get_report(
             "abstention_decision": ml_data.get("abstention_decision"),
             "skill_gap_analysis": ml_data.get("skill_gap_analysis"),
         }
+
+    status_str = assessment.status if isinstance(assessment.status, str) else assessment.status.value
 
     return AssessmentReport(
         generated_at=datetime.now(timezone.utc),
@@ -911,24 +928,24 @@ async def get_report(
         },
         assessment={
             "id": str(assessment.id),
-            "status": assessment.status.value,
+            "status": status_str,
             "trade": assessment.trade,
             "started_at": assessment.started_at.isoformat() if assessment.started_at else None,
             "completed_at": assessment.completed_at.isoformat() if assessment.completed_at else None,
         },
         evidence_summary={
             "total": len(evidence_records),
-            "verified": sum(1 for e in evidence_records if e.verification_status.value == "VERIFIED"),
-            "unverified": sum(1 for e in evidence_records if e.verification_status.value == "UNVERIFIED"),
-            "rejected": sum(1 for e in evidence_records if e.verification_status.value == "REJECTED"),
+            "verified": sum(1 for e in evidence_records if e.verification_status == "VERIFIED"),
+            "unverified": sum(1 for e in evidence_records if e.verification_status == "UNVERIFIED"),
+            "rejected": sum(1 for e in evidence_records if e.verification_status == "REJECTED"),
             "records": [
                 {
                     "id": str(e.id),
-                    "evidence_type": e.evidence_type.value,
-                    "source_type": e.source_type.value,
+                    "evidence_type": e.evidence_type,
+                    "source_type": e.source_type,
                     "description": e.description,
                     "nos_id": e.nos_id,
-                    "verification_status": e.verification_status.value,
+                    "verification_status": e.verification_status,
                 }
                 for e in evidence_records
             ],
@@ -936,7 +953,7 @@ async def get_report(
         ai_runs=[
             {
                 "id": str(r.id),
-                "status": r.run_status.value,
+                "status": r.run_status,
                 "recommendation": r.recommendation,
                 "created_at": r.created_at.isoformat(),
                 "error": r.error_detail,
@@ -947,8 +964,8 @@ async def get_report(
             {
                 "id": str(t.id),
                 "title": t.title,
-                "status": t.status.value,
-                "selection_source": t.selection_source.value,
+                "status": t.status,
+                "selection_source": t.selection_source,
                 "target_nos_id": t.target_nos_id,
                 "score": t.score,
                 "assessor_comments": t.assessor_comments,
@@ -959,7 +976,7 @@ async def get_report(
         latest_decision=(
             {
                 "id": str(latest_decision.id),
-                "action": latest_decision.action.value,
+                "action": latest_decision.action,
                 "comments": latest_decision.comments,
                 "modified_recommendation": latest_decision.modified_recommendation,
                 "created_at": latest_decision.created_at.isoformat(),
@@ -969,12 +986,12 @@ async def get_report(
         ),
         audit_timeline=[
             {
-                "id": str(e.id),
-                "action": e.action,
-                "entity_type": e.entity_type,
-                "entity_id": e.entity_id,
-                "actor": e.actor_label,
-                "timestamp": e.created_at.isoformat(),
+                "id": str(e.get("id")),
+                "action": e.get("action"),
+                "entity_type": e.get("entity_type"),
+                "entity_id": e.get("entity_id"),
+                "actor": e.get("actor_label"),
+                "timestamp": e.get("timestamp").isoformat() if isinstance(e.get("timestamp"), datetime) else str(e.get("timestamp")),
             }
             for e in audit_events
         ],

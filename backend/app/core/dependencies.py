@@ -2,7 +2,7 @@
 KaushalTwin Backend — FastAPI Dependencies
 
 Provides reusable dependency functions for:
-- Async DB session
+- Async MongoDB database instance
 - Current authenticated user extraction
 - Role-based authorization guards
 """
@@ -14,10 +14,10 @@ from typing import Optional
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.ext.asyncio import AsyncSession
+from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.security import decode_access_token
-from app.db.session import get_db_session
+from app.db.mongodb import get_database
 from app.db.models.user import User, UserRole
 
 # ---------------------------------------------------------------------------
@@ -28,13 +28,12 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
 # ---------------------------------------------------------------------------
-# Database session dependency
+# Database dependency
 # ---------------------------------------------------------------------------
 
-async def get_db() -> AsyncSession:
-    """Yield an async SQLAlchemy session, closing it on completion."""
-    async for session in get_db_session():
-        yield session
+async def get_db() -> AsyncIOMotorDatabase:
+    """Yield the async MongoDB database instance."""
+    return get_database()
 
 
 # ---------------------------------------------------------------------------
@@ -43,10 +42,10 @@ async def get_db() -> AsyncSession:
 
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
 ) -> User:
     """
-    Validate the bearer token, load the User from the database, and
+    Validate the bearer token, load the User from MongoDB, and
     raise HTTP 401 for any authentication failure.
     """
     credentials_exception = HTTPException(
@@ -59,18 +58,11 @@ async def get_current_user(
     if not user_id_str:
         raise credentials_exception
 
-    try:
-        user_id = uuid.UUID(user_id_str)
-    except ValueError:
+    user_doc = await db.users.find_one({"id": user_id_str})
+    if user_doc is None:
         raise credentials_exception
 
-    from sqlalchemy import select
-    result = await db.execute(select(User).where(User.id == user_id))
-    user: Optional[User] = result.scalar_one_or_none()
-
-    if user is None:
-        raise credentials_exception
-    return user
+    return User.from_mongo(user_doc)
 
 
 async def get_current_active_user(
@@ -93,12 +85,6 @@ def require_role(*roles: UserRole):
     """
     Factory that returns a dependency enforcing the caller has one of the
     listed roles.
-
-    Usage::
-
-        @router.post("/admin-only")
-        async def endpoint(user=Depends(require_role(UserRole.ADMIN))):
-            ...
     """
 
     async def _guard(
