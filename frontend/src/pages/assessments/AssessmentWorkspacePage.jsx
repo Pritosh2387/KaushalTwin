@@ -71,6 +71,24 @@ export function AssessmentWorkspacePage() {
     enabled: !!id,
   });
 
+  const { data: aiRuns, refetch: refetchAiRuns } = useQuery({
+    queryKey: ['assessment-ai-runs', id],
+    queryFn: () => assessmentsApi.getAIResults(id),
+    enabled: !!id,
+  });
+
+  const { data: recommendation, refetch: refetchRecommendation } = useQuery({
+    queryKey: ['assessment-recommendation', id],
+    queryFn: () => assessmentsApi.getLatestRecommendation(id),
+    enabled: !!id,
+  });
+
+  const { data: reportData } = useQuery({
+    queryKey: ['assessment-report', id],
+    queryFn: () => assessmentsApi.getAssessmentReport(id),
+    enabled: !!id,
+  });
+
   // Mutations
   const startMutation = useMutation({
     mutationFn: () => assessmentsApi.start(id),
@@ -193,12 +211,21 @@ export function AssessmentWorkspacePage() {
   }
 
   const tasks = tasksData?.items || assessment.tasks || [];
-  const candidateCompetencies = assessment.candidate_competencies || [];
-  const latestAiRun = assessment.latest_ai_run || null;
-  const decision = assessment.decision || null;
+  // competencies come from the latest completed AI run's ml_response
+  const latestAiRun = aiRuns?.items?.[0] || aiRuns?.[0] || null;
+  const candidateCompetencies = latestAiRun?.ml_response?.competency_twin?.competencies ||
+    latestAiRun?.ml_response?.nos_candidates ||
+    latestAiRun?.ml_response?.results?.competencies ||
+    [];
+  // decision comes from the recommendation query
+  const decision = recommendation?.decision || null;
+  const aiRecommendation = recommendation?.recommendation ||
+    latestAiRun?.ml_response?.recommendation ||
+    latestAiRun?.recommendation ||
+    null;
 
   const tabs = [
-    { id: 'analysis', label: 'AI Competency Analysis', icon: Cpu, badge: candidateCompetencies.length },
+    { id: 'analysis', label: 'AI Competency Analysis', icon: Cpu, badge: candidateCompetencies.length || (latestAiRun ? '✓' : null) },
     { id: 'tasks', label: 'Adaptive Tasks', icon: Layers, badge: tasks.length },
     { id: 'decision', label: 'Assessor Decision', icon: ShieldCheck, badge: decision ? 'Decided' : 'Pending' },
     { id: 'overview', label: 'Candidate Baseline', icon: ClipboardCheck },
@@ -524,7 +551,7 @@ export function AssessmentWorkspacePage() {
                     AI Algorithmic Recommendation
                   </span>
                   <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-cyan-100 text-cyan-800">
-                    {assessment.ai_recommendation || 'RECOMMEND_CERTIFICATION'}
+                    {aiRecommendation || (latestAiRun ? latestAiRun.run_status : 'PENDING')}
                   </span>
                 </div>
                 <p className="text-xs text-slate-600">

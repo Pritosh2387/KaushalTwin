@@ -104,10 +104,15 @@ export const assessmentsApi = {
   start: async (id) => assessmentsApi.startAssessment(id),
   complete: async (id) => assessmentsApi.completeAssessment(id),
   getTasks: async (id) => assessmentsApi.getAssessmentTasks(id),
+  submitTaskResult: async (id, taskId, data) => assessmentsApi.submitTaskResult(id, taskId, data),
   analyze: async (id, params) => assessmentsApi.triggerAIAnalysis(id, params),
   checkEvidence: async (id) => assessmentsApi.checkEvidenceSufficiency(id),
+  recommendNextTask: async (id) => assessmentsApi.recommendNextTask(id),
   recordDecision: async (id, data) => assessmentsApi.submitAssessorDecision(id, data),
   getReport: async (id) => assessmentsApi.getAssessmentReport(id),
+  getAIResults: async (id) => assessmentsApi.getAIResults(id),
+  getLatestRecommendation: async (id) => assessmentsApi.getLatestRecommendation(id),
+  getAssessmentReport: async (id) => assessmentsApi.getAssessmentReport(id),
 };
 
 export default assessmentsApi;

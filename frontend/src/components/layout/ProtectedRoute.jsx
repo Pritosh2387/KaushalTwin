@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Skeleton } from '../ui/Skeleton';
 
 export function ProtectedRoute({ children, allowedRoles }) {
-  const { isAuthenticated, loading, user } = useAuth();
+  const { isAuthenticated, isLoading: loading, user } = useAuth();
   const location = useLocation();
 
   if (loading) {

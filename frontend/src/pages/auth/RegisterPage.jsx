@@ -42,11 +42,10 @@ export function RegisterPage() {
 
     try {
       await register({
+        name: formData.fullName,
         email: formData.email,
         password: formData.password,
-        full_name: formData.fullName,
         role: formData.role,
-        organization: formData.organization || undefined,
       });
       navigate('/', { replace: true });
     } catch (err) {
