@@ -20,13 +20,18 @@ def preprocess_text_endpoint(request: PreprocessRequest) -> PreprocessResponse:
     - Splits into sentences and tokens.
     """
     try:
-        result = preprocess_text(
+        return preprocess_text(
             request.text,
             language=request.language,
             lowercase=request.lowercase,
         )
-        return PreprocessResponse(**result)
+    except InvalidInputError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"error": {"code": exc.error_code, "message": exc.message}},
+        ) from exc
     except ValueError as exc:
+        # Keep ValueError handling for backward compatibility
         raise HTTPException(
             status_code=422,
             detail={"error": {"code": "INVALID_INPUT", "message": str(exc)}},

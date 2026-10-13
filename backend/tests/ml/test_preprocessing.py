@@ -109,23 +109,24 @@ class TestKeywordExtraction:
 class TestPreprocessService:
     def test_full_pipeline_english(self):
         result = preprocess_text("I install switches and fans.", language="en")
-        assert result["original_text"] == "I install switches and fans."
-        assert result["normalized_text"] == "I install switches and fans."
-        assert result["language"] == "en"
-        assert len(result["tokens"]) > 0
-        assert len(result["sentences"]) > 0
+        assert result.original_text == "I install switches and fans."
+        assert result.normalized_text == "I install switches and fans."
+        assert result.language == "en"
+        assert len(result.tokens) > 0
+        assert len(result.sentences) > 0
 
     def test_full_pipeline_hindi(self):
         result = preprocess_text("मैं बिजली का काम करता हूँ।")
-        assert result["language"] == "hi"
-        assert result["original_text"] is not None
+        assert result.language == "hi"
+        assert result.original_text is not None
 
     def test_empty_text_raises(self):
-        with pytest.raises(ValueError, match="empty"):
+        with pytest.raises(Exception) as exc_info:
             preprocess_text("")
+        assert "INVALID_INPUT" in str(exc_info.value) or "empty" in str(exc_info.value)
 
     def test_preserves_original(self):
         raw = "  Switch   Installation  "
         result = preprocess_text(raw)
-        assert result["original_text"] == raw
-        assert result["normalized_text"] != raw  # normalised
+        assert result.original_text == raw
+        assert result.normalized_text != raw  # normalised

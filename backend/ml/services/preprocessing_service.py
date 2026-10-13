@@ -11,20 +11,22 @@ from ml.utils.normalisation import (
     split_sentences,
     infer_language,
 )
+from ml.schemas.preprocessing import PreprocessResponse
+from ml.services.exceptions import InvalidInputError
 
 
 def preprocess_text(
     text: str,
     language: str | None = None,
     lowercase: bool = False,
-) -> dict:
+) -> PreprocessResponse:
     """
     Full text preprocessing pipeline.
 
     Returns both original and normalised text; never destroys source.
     """
     if not text or not text.strip():
-        raise ValueError("Input text cannot be empty.")
+        raise InvalidInputError("Input text cannot be empty.")
 
     original_text = text
     normalised = normalise_text(text, lowercase=lowercase)
@@ -32,12 +34,12 @@ def preprocess_text(
     tokens = tokenise(normalised)
     sentences = split_sentences(normalised)
 
-    return {
-        "original_text": original_text,
-        "normalized_text": normalised,
-        "language": detected_language,
-        "tokens": tokens,
-        "sentences": sentences,
-        "token_count": len(tokens),
-        "sentence_count": len(sentences),
-    }
+    return PreprocessResponse(
+        original_text=original_text,
+        normalized_text=normalised,
+        language=detected_language,
+        tokens=tokens,
+        sentences=sentences,
+        token_count=len(tokens),
+        sentence_count=len(sentences),
+    )

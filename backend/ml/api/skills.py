@@ -44,18 +44,11 @@ def extract_skills_endpoint(request: SkillExtractionRequest) -> SkillExtractionR
     - Supports Hindi, English, and Hinglish input.
     """
     try:
-        result = extract_skills(
+        return extract_skills(
             text=request.text,
             language=request.language,
             trade=request.trade,
             provider_name=request.provider,
-        )
-        return SkillExtractionResponse(
-            skills=[ExtractedSkill(**s) for s in result["skills"]],
-            count=result["count"],
-            provider=result["provider"],
-            trade=result["trade"],
-            language=result["language"],
         )
     except Exception as exc:
         raise HTTPException(

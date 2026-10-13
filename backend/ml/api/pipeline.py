@@ -111,12 +111,12 @@ def run_pipeline(request: PipelineRequest) -> PipelineResponse:
 
         # Step 2: Extract skills
         skill_result = extract_skills(
-            text=pre["normalized_text"],
-            language=pre["language"],
+            text=pre.normalized_text,
+            language=pre.language,
             trade=request.trade,
             provider_name="demo",
         )
-        skills = skill_result["skills"]
+        skills = [s.model_dump() for s in skill_result.skills]
 
         # Step 3: Map skills to NOS candidates
         nos_mappings = map_skills_to_nos(skills, top_k=request.top_k_nos)
@@ -330,7 +330,7 @@ def run_pipeline(request: PipelineRequest) -> PipelineResponse:
 
         return PipelineResponse(
             worker_id=request.worker_id,
-            preprocessing=pre,
+            preprocessing=pre.dict(),
             skills=skills,
             nos_candidates=nos_mappings,
             competency_twin=twin,

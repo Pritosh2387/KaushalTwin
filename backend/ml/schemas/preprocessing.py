@@ -3,7 +3,7 @@ KaushalTwin ML Service — Pydantic Schemas: Preprocessing (Module 1)
 """
 
 from __future__ import annotations
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -21,10 +21,10 @@ class PreprocessRequest(BaseModel):
 
 
 class PreprocessResponse(BaseModel):
-    original_text: str
-    normalized_text: str
-    language: str
-    tokens: list[str]
-    sentences: list[str]
-    token_count: int
-    sentence_count: int
+    original_text: str = Field(..., description="Original input text")
+    normalized_text: str = Field(..., description="Text after Unicode, whitespace and punctuation normalization")
+    language: str = Field(..., description="Detected or provided language code (hi, en, mixed)")
+    tokens: List[str] = Field(..., description="List of normalized tokens")
+    sentences: List[str] = Field(..., description="List of normalized sentences")
+    token_count: int = Field(..., ge=0, description="Number of tokens")
+    sentence_count: int = Field(..., ge=0, description="Number of sentences")
