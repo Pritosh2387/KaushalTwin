@@ -11,16 +11,16 @@ export function EmptyState({
 }) {
   return (
     <div
-      className={`flex flex-col items-center justify-center p-8 sm:p-12 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-300 ${className}`}
+      className={`flex flex-col items-center justify-center p-8 sm:p-12 text-center bg-[#050505] rounded-none border border-dashed border-white/15 ${className}`}
     >
       {Icon && (
-        <div className="w-14 h-14 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-400 mb-4">
-          <Icon className="w-7 h-7 text-slate-500" />
+        <div className="w-12 h-12 rounded-none bg-[#09090b] border border-white/20 flex items-center justify-center text-zinc-300 mb-4">
+          <Icon className="w-5 h-5 text-zinc-200" />
         </div>
       )}
-      <h3 className="text-base font-semibold text-slate-900">{title}</h3>
+      <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">{title}</h3>
       {description && (
-        <p className="text-sm text-slate-500 max-w-sm mt-1.5 leading-relaxed">
+        <p className="text-xs text-zinc-400 max-w-sm mt-1.5 leading-relaxed font-light">
           {description}
         </p>
       )}
@@ -34,3 +34,5 @@ export function EmptyState({
     </div>
   );
 }
+
+export default EmptyState;

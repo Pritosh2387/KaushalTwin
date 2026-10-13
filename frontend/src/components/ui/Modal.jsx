@@ -32,33 +32,33 @@ export function Modal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
+        className="fixed inset-0 bg-black/85 backdrop-blur-md transition-opacity"
         onClick={onClose}
         aria-hidden="true"
       />
 
       {/* Modal Dialog */}
       <div
-        className={`relative w-full ${maxWidth} bg-white rounded-2xl shadow-2xl border border-slate-200 z-10 flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150 ${className}`}
+        className={`relative w-full ${maxWidth} bg-[#050505] rounded-none shadow-[0_20px_60px_rgba(0,0,0,0.9)] border border-white/15 z-10 flex flex-col max-h-[90vh] specular-top-edge animate-in fade-in zoom-in-95 duration-150 ${className}`}
         role="dialog"
         aria-modal="true"
       >
         {/* Header */}
-        <div className="flex items-start justify-between p-6 border-b border-slate-100">
+        <div className="flex items-start justify-between p-6 border-b border-white/10 bg-[#070707]">
           <div>
             {title && (
-              <h2 className="text-xl font-bold text-slate-900 leading-tight">
+              <h2 className="text-lg font-bold text-white uppercase tracking-wider font-mono">
                 {title}
               </h2>
             )}
             {description && (
-              <p className="text-sm text-slate-500 mt-1">{description}</p>
+              <p className="text-xs text-zinc-400 mt-1 font-light leading-relaxed">{description}</p>
             )}
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors ml-4"
+            className="p-1.5 text-zinc-400 hover:text-white hover:bg-white/10 rounded-none transition-colors ml-4 cursor-pointer"
           >
             <X className="w-5 h-5" />
             <span className="sr-only">Close modal</span>
@@ -71,3 +71,5 @@ export function Modal({
     </div>
   );
 }
+
+export default Modal;

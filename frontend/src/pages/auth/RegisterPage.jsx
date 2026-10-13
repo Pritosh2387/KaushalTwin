@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Sparkles, Shield, ArrowRight } from 'lucide-react';
+import { Shield, ArrowRight, Compass } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
@@ -47,7 +47,7 @@ export function RegisterPage() {
         password: formData.password,
         role: formData.role,
       });
-      navigate('/', { replace: true });
+      navigate('/dashboard', { replace: true });
     } catch (err) {
       setError(
         err?.response?.data?.detail ||
@@ -59,32 +59,31 @@ export function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden">
-      <div className="absolute top-0 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+    <div className="min-h-screen bg-[#000000] flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden select-none">
+      <div className="absolute inset-0 obsidian-grid opacity-30 pointer-events-none" />
 
-      <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10 text-center">
-        <div className="flex items-center justify-center gap-3 mb-4">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-cyan-400 to-teal-300 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-            <Sparkles className="w-6 h-6 text-navy-950 font-bold" />
+      <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10 px-4 sm:px-0">
+        <div className="flex flex-col items-center text-center mb-8">
+          <div className="w-10 h-10 border border-white/30 bg-[#080808] flex items-center justify-center rotate-45 mb-4 shadow-[0_0_20px_rgba(255,255,255,0.1)]">
+            <div className="w-4 h-4 bg-white -rotate-45" />
           </div>
-          <div className="text-left">
-            <h1 className="text-2xl font-black text-white tracking-tight">
-              KaushalTwin
-            </h1>
-            <p className="text-xs text-slate-400 font-medium">
-              Create an RPL Assessor or Worker Profile
-            </p>
-          </div>
+          <h1 className="text-xl font-mono font-bold text-white tracking-widest uppercase flex items-center gap-2">
+            KAUSHALTWIN
+            <span className="text-[10px] font-mono px-1.5 py-0.5 bg-white/10 text-white border border-white/20">
+              RPL
+            </span>
+          </h1>
+          <p className="text-xs text-zinc-400 font-mono mt-1 tracking-wider uppercase">
+            REGISTER PROFILE
+          </p>
         </div>
-      </div>
 
-      <div className="mt-4 sm:mx-auto sm:w-full sm:max-w-md relative z-10 px-4 sm:px-0">
-        <div className="bg-white py-8 px-6 shadow-2xl rounded-2xl sm:px-10 border border-slate-100">
+        <div className="bg-[#050505] py-8 px-6 sm:px-10 border border-white/15 specular-top-edge">
           <div className="mb-6">
-            <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-              Register New User
+            <h2 className="text-sm font-mono font-bold text-white uppercase tracking-wider">
+              NEW CANDIDATE / ASSESSOR
             </h2>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-zinc-400 font-light mt-1">
               Join the national skill assessment framework
             </p>
           </div>
@@ -97,62 +96,54 @@ export function RegisterPage() {
 
           <form className="space-y-4" onSubmit={handleSubmit}>
             <Input
-              label="Full Name"
+              label="Full Legal Name"
+              type="text"
               name="fullName"
               required
-              placeholder="e.g. Ramesh Chandra Verma"
+              placeholder="e.g. Ramesh Kumar"
               value={formData.fullName}
               onChange={handleChange}
             />
 
             <Input
-              label="Email Address"
-              name="email"
+              label="Official Email"
               type="email"
+              name="email"
               required
-              placeholder="e.g. ramesh@example.org"
+              placeholder="assessor@kaushaltwin.gov.in"
               value={formData.email}
               onChange={handleChange}
             />
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Input
-                label="Password"
-                name="password"
-                type="password"
-                required
-                placeholder="••••••••"
-                value={formData.password}
-                onChange={handleChange}
-              />
-              <Input
-                label="Confirm Password"
-                name="confirmPassword"
-                type="password"
-                required
-                placeholder="••••••••"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-              />
-            </div>
-
             <Select
-              label="Role"
+              label="System Authority Role"
               name="role"
               value={formData.role}
               onChange={handleChange}
               options={[
-                { value: 'ASSESSOR', label: 'Certified RPL Assessor' },
-                { value: 'WORKER', label: 'Candidate / Worker' },
+                { value: 'ASSESSOR', label: 'Accredited Assessor' },
+                { value: 'WORKER', label: 'RPL Candidate / Worker' },
                 { value: 'ADMIN', label: 'System Administrator' },
               ]}
             />
 
             <Input
-              label="Organization / Sector Council (Optional)"
-              name="organization"
-              placeholder="e.g. Automotive Skills Development Council (ASDC)"
-              value={formData.organization}
+              label="Security Key"
+              type="password"
+              name="password"
+              required
+              placeholder="••••••••"
+              value={formData.password}
+              onChange={handleChange}
+            />
+
+            <Input
+              label="Confirm Key"
+              type="password"
+              name="confirmPassword"
+              required
+              placeholder="••••••••"
+              value={formData.confirmPassword}
               onChange={handleChange}
             />
 
@@ -160,28 +151,34 @@ export function RegisterPage() {
               <Button
                 type="submit"
                 variant="primary"
-                className="w-full justify-center py-2.5 text-sm"
+                className="w-full justify-center py-3 font-mono text-xs tracking-widest uppercase"
                 loading={loading}
               >
-                <span>Complete Registration</span>
-                <ArrowRight className="w-4 h-4 ml-1" />
+                <span>CREATE PROFILE ↗</span>
               </Button>
             </div>
           </form>
 
-          <div className="mt-6 text-center">
-            <p className="text-xs text-slate-500">
-              Already have an account?{' '}
+          <div className="mt-6 text-center border-t border-white/5 pt-4">
+            <p className="text-xs font-mono text-zinc-400">
+              ALREADY REGISTERED?{' '}
               <Link
                 to="/login"
-                className="font-semibold text-cyan-600 hover:text-cyan-700 hover:underline"
+                className="text-white underline hover:text-zinc-200 uppercase"
               >
-                Sign in here
+                SIGN IN HERE
               </Link>
             </p>
           </div>
+        </div>
+
+        <div className="mt-6 flex items-center justify-center gap-2 text-[10px] font-mono text-zinc-500 uppercase tracking-widest text-center">
+          <Shield className="w-3.5 h-3.5 text-zinc-400" />
+          <span>HUMAN-CERTIFIED DECISION WORKFLOW</span>
         </div>
       </div>
     </div>
   );
 }
+
+export default RegisterPage;

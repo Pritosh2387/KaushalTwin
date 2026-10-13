@@ -7,24 +7,49 @@ export default {
   theme: {
     extend: {
       colors: {
-        navy: {
-          950: '#070C1E',
-          900: '#0B132B',
-          850: '#131D38',
-          800: '#1C2541',
-          700: '#273456',
-          600: '#3A506B',
+        obsidian: {
+          DEFAULT: '#000000',
+          950: '#020202',
+          900: '#050505',
+          850: '#09090b',
+          800: '#0f0f12',
+          750: '#141418',
+          700: '#18181b',
+          600: '#27272a',
+          500: '#3f3f46',
         },
-        ai: {
-          cyan: '#06B6D4',
-          teal: '#14B8A6',
-          glow: 'rgba(6, 182, 212, 0.15)',
+        silver: {
+          DEFAULT: '#d4d4d8',
+          50: '#fafafa',
+          100: '#f4f4f5',
+          200: '#e4e4e7',
+          300: '#d4d4d8',
+          400: '#a1a1aa',
+          500: '#71717a',
+          600: '#52525b',
+          700: '#3f3f46',
+          800: '#27272a',
+          900: '#18181b',
+        },
+        navy: {
+          950: '#000000',
+          900: '#050505',
+          850: '#09090b',
+          800: '#121214',
+          700: '#18181b',
+          600: '#27272a',
         },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        mono: ['JetBrains Mono', 'Menlo', 'Consolas', 'monospace'],
+      },
+      letterSpacing: {
+        'ultra-wide': '0.25em',
+        'mega-wide': '0.35em',
       },
     },
   },
   plugins: [],
 }
+

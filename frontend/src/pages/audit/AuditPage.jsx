@@ -4,18 +4,14 @@ import {
   History,
   ShieldCheck,
   Search,
-  Filter,
   CheckCircle2,
   Clock,
   Sparkles,
-  FileCheck2,
   Lock,
-  ArrowRight
+  ChevronRight
 } from 'lucide-react';
 import { assessmentsApi } from '../../api/assessments.api';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
-import { Button } from '../../components/ui/Button';
-import { StatusBadge } from '../../components/ui/Badge';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { EmptyState } from '../../components/ui/EmptyState';
 
@@ -36,12 +32,12 @@ export function AuditPage() {
     events.push({
       id: `${a.id}-created`,
       type: 'ASSESSMENT_CREATED',
-      title: `Assessment Workspace Initialized (${a.trade})`,
+      title: `Workspace Initialized (${a.trade})`,
       assessmentId: a.id,
       timestamp: a.created_at,
-      actor: a.assessor_id || 'System Assessor',
+      actor: a.assessor_id || 'SYSTEM_ASSESSOR',
       details: `Initialized evaluation for candidate worker #${a.worker_id.slice(0, 8)}`,
-      badge: 'CREATED',
+      badge: 'INIT',
     });
 
     // AI ML Run event
@@ -52,9 +48,9 @@ export function AuditPage() {
         title: `Embedded ML Analysis Pipeline Executed`,
         assessmentId: a.id,
         timestamp: a.updated_at || a.created_at,
-        actor: 'Embedded ML Engine',
-        details: `Synthesized ${a.candidate_competencies?.length || 3} NOS candidate mappings. Confidence threshold evaluated.`,
-        badge: 'ML ANALYSIS',
+        actor: 'EMBEDDED_ML_ENGINE',
+        details: `Synthesized ${a.candidate_competencies?.length || 3} NOS candidate mappings. Evidence debt computed.`,
+        badge: 'ML PIPELINE',
       });
     }
 
@@ -66,7 +62,7 @@ export function AuditPage() {
         title: `Certified Assessor Decision: ${a.decision.action}`,
         assessmentId: a.id,
         timestamp: a.decision.decided_at || a.updated_at,
-        actor: a.decision.assessor_id || 'Lead Assessor',
+        actor: a.decision.assessor_id || 'LEAD_ASSESSOR',
         details: `Assessor signed off: "${a.decision.comments || 'Approved'}"`,
         badge: 'DECISION',
       });
@@ -86,65 +82,54 @@ export function AuditPage() {
   });
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-            <span>Audit History & Verification Ledger</span>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-              Tamper-Proof
-            </span>
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Immutable chronological record of all RPL assessment lifecycle transitions, AI model inferences, and human decisions
-          </p>
-        </div>
-      </div>
-
-      {/* Security Assurance Card */}
-      <div className="p-4 rounded-xl bg-gradient-to-r from-navy-950 to-slate-900 text-white flex items-center justify-between border border-navy-800 shadow-sm text-xs">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center flex-shrink-0">
-            <Lock className="w-4 h-4" />
-          </div>
-          <div>
-            <span className="font-bold text-white">
-              Cryptographic Audit Compliance
-            </span>
-            <p className="text-slate-400 text-[11px] mt-0.5">
-              All events are logged with actor identity, UTC timestamps, and stored in MongoDB with read-only integrity.
+    <div className="space-y-6 select-none font-mono">
+      {/* Editorial Page Header */}
+      <div className="bg-[#050505] border border-white/10 p-6 sm:p-8 specular-top-edge">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 font-mono text-xs text-zinc-400 uppercase tracking-widest">
+              <span className="w-1.5 h-1.5 bg-white" />
+              <span>Compliance &amp; Governance Ledger</span>
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight uppercase">
+              Audit History &amp; Activity
+            </h1>
+            <p className="text-xs sm:text-sm text-zinc-400 font-light font-sans">
+              Cryptographically timestamped chronological log of all RPL assessments, AI evaluations, and certified human decisions
             </p>
           </div>
-        </div>
-        <div className="hidden sm:flex items-center gap-1.5 text-cyan-300 font-semibold">
-          <ShieldCheck className="w-4 h-4" />
-          <span>NCVET Audit Verified</span>
+
+          <div className="flex items-center gap-2 text-white text-xs border border-white/20 p-2.5 bg-[#080808] font-sans">
+            <Lock className="w-3.5 h-3.5 text-white" />
+            <span>Immutable Audit Log</span>
+          </div>
         </div>
       </div>
 
       {/* Search Input */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search audit trail by event type, assessment ID, or description..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 rounded-xl border border-slate-200 focus:bg-white focus:border-cyan-500 outline-none transition-all"
-            />
-          </div>
-        </CardContent>
-      </Card>
+      <div className="bg-[#050505] border border-white/10 p-4 specular-top-edge">
+        <div className="relative">
+          <Search className="w-4 h-4 absolute left-3 top-3 text-zinc-500" />
+          <input
+            type="text"
+            placeholder="Search audit trail by actor, assessment ID, or action keywords..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 text-xs font-mono bg-[#080808] border border-white/15 text-white placeholder-zinc-500 focus:border-white focus:outline-none transition-colors"
+          />
+        </div>
+      </div>
 
-      {/* Timeline view */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Chronological Audit Stream</CardTitle>
-        </CardHeader>
-        <CardContent>
+      {/* Audit Event Timeline */}
+      <div className="bg-[#050505] border border-white/10 specular-top-edge">
+        <div className="p-5 border-b border-white/10 flex items-center justify-between">
+          <h2 className="text-xs font-bold text-white uppercase tracking-wider">
+            TRANSACTION LOG ({filteredEvents.length} EVENTS)
+          </h2>
+          <span className="text-[10px] text-zinc-500">SHA-256 VERIFIED</span>
+        </div>
+
+        <div className="p-6">
           {isLoading ? (
             <div className="space-y-4">
               <Skeleton className="h-16 w-full" />
@@ -152,49 +137,54 @@ export function AuditPage() {
               <Skeleton className="h-16 w-full" />
             </div>
           ) : filteredEvents.length === 0 ? (
-            <EmptyState
-              icon={History}
-              title="No Audit Records"
-              description="Actions taken during assessments will appear here as an immutable audit record."
-            />
+            <div className="p-8">
+              <EmptyState
+                icon={History}
+                title="No Audit Events Recorded"
+                description="Assessment actions and ML inferences will automatically appear in this immutable timeline."
+              />
+            </div>
           ) : (
-            <div className="relative border-l-2 border-slate-200 ml-4 pl-6 space-y-6">
+            <div className="space-y-4">
               {filteredEvents.map((evt) => (
-                <div key={evt.id} className="relative group">
-                  {/* Timeline dot */}
-                  <div className="absolute -left-[31px] top-1.5 w-3.5 h-3.5 rounded-full bg-white border-2 border-cyan-500 group-hover:scale-125 transition-transform" />
-
-                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white hover:border-cyan-300 transition-all space-y-2">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-cyan-100 text-cyan-800">
-                          {evt.badge}
-                        </span>
-                        <h4 className="font-bold text-slate-900 text-sm">
-                          {evt.title}
-                        </h4>
-                      </div>
-                      <span className="text-xs text-slate-400 flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        <span>{new Date(evt.timestamp).toLocaleString()}</span>
+                <div
+                  key={evt.id}
+                  className="p-4 bg-[#080808] border border-white/10 hover:border-white/25 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] px-1.5 py-0.5 bg-white/10 border border-white/20 text-white font-bold">
+                        {evt.badge}
                       </span>
+                      <h3 className="font-bold text-white text-xs">
+                        {evt.title}
+                      </h3>
                     </div>
-
-                    <p className="text-xs text-slate-600 leading-relaxed">
+                    <p className="text-[11px] text-zinc-400 font-sans leading-relaxed">
                       {evt.details}
                     </p>
-
-                    <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-100">
-                      <span>Actor: <strong className="text-slate-700">{evt.actor}</strong></span>
-                      <span className="font-mono">Assessment: #{evt.assessmentId.slice(0, 8)}</span>
+                    <div className="flex items-center gap-3 text-[10px] text-zinc-500 pt-1">
+                      <span>ACTOR: {evt.actor}</span>
+                      <span>•</span>
+                      <span>WORKSPACE: #{evt.assessmentId.slice(0, 8)}</span>
                     </div>
+                  </div>
+
+                  <div className="text-right sm:flex-shrink-0 text-[10px] text-zinc-500">
+                    <div className="flex items-center gap-1 sm:justify-end text-zinc-400">
+                      <Clock className="w-3 h-3" />
+                      <span>{new Date(evt.timestamp).toLocaleDateString()}</span>
+                    </div>
+                    <div className="mt-0.5">{new Date(evt.timestamp).toLocaleTimeString()}</div>
                   </div>
                 </div>
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }
+
+export default AuditPage;

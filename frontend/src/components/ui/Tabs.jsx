@@ -2,7 +2,7 @@ import React from 'react';
 
 export function Tabs({ tabs, activeTab, onChange, className = '' }) {
   return (
-    <div className={`border-b border-slate-200 overflow-x-auto no-scrollbar ${className}`}>
+    <div className={`border-b border-white/10 overflow-x-auto no-scrollbar ${className}`}>
       <nav className="flex space-x-6 min-w-max" aria-label="Tabs">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
@@ -11,20 +11,20 @@ export function Tabs({ tabs, activeTab, onChange, className = '' }) {
             <button
               key={tab.id}
               onClick={() => onChange(tab.id)}
-              className={`flex items-center gap-2 py-3 px-1 border-b-2 font-medium text-sm transition-all duration-150 ${
+              className={`flex items-center gap-2 py-3 px-1 border-b-2 font-medium text-xs tracking-wider uppercase transition-all duration-150 cursor-pointer ${
                 isActive
-                  ? 'border-cyan-500 text-cyan-600 font-semibold'
-                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                  ? 'border-white text-white font-semibold'
+                  : 'border-transparent text-zinc-500 hover:text-zinc-300 hover:border-zinc-700'
               }`}
             >
-              {Icon && <Icon className={`w-4 h-4 ${isActive ? 'text-cyan-500' : 'text-slate-400'}`} />}
+              {Icon && <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-zinc-500'}`} />}
               <span>{tab.label}</span>
               {tab.badge !== undefined && (
                 <span
-                  className={`ml-1 px-2 py-0.5 text-xs rounded-full ${
+                  className={`ml-1 px-1.5 py-0.5 text-[10px] font-mono border ${
                     isActive
-                      ? 'bg-cyan-100 text-cyan-700 font-semibold'
-                      : 'bg-slate-100 text-slate-600'
+                      ? 'bg-white text-black border-white font-semibold'
+                      : 'bg-[#0a0a0a] text-zinc-400 border-white/10'
                   }`}
                 >
                   {tab.badge}
@@ -37,3 +37,5 @@ export function Tabs({ tabs, activeTab, onChange, className = '' }) {
     </div>
   );
 }
+
+export default Tabs;

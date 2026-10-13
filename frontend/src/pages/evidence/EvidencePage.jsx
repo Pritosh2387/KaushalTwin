@@ -6,15 +6,12 @@ import {
   CheckCircle2,
   XCircle,
   Eye,
-  Filter,
-  Plus,
   Search,
   FileText,
   Image as ImageIcon,
   Award,
-  AlertCircle,
-  Clock,
-  Sparkles
+  ShieldCheck,
+  ChevronRight
 } from 'lucide-react';
 import { evidenceApi } from '../../api/evidence.api';
 import { workersApi } from '../../api/workers.api';
@@ -135,29 +132,32 @@ export function EvidencePage() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-            <span>Evidence Portfolio</span>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
-              {evidenceData?.total ?? evidenceList.length} Items
-            </span>
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Artifacts, work samples, and prior learning documentation submitted by candidates
-          </p>
-        </div>
+    <div className="space-y-6 select-none">
+      {/* Editorial Page Header */}
+      <div className="bg-[#050505] border border-white/10 p-6 sm:p-8 specular-top-edge">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 font-mono text-xs text-zinc-400 uppercase tracking-widest">
+              <span className="w-1.5 h-1.5 bg-white" />
+              <span>Evidence Integrity &amp; Verification</span>
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight uppercase">
+              Candidate Evidence
+            </h1>
+            <p className="text-xs sm:text-sm text-zinc-400 font-light">
+              Multi-modal artifacts, candidate logbooks, and work sample verification ({evidenceData?.total ?? evidenceList.length} items)
+            </p>
+          </div>
 
-        <Button
-          variant="primary"
-          onClick={() => setIsUploadOpen(true)}
-          className="bg-cyan-500 hover:bg-cyan-400 text-navy-950 font-bold shadow-md shadow-cyan-500/20"
-        >
-          <UploadCloud className="w-4 h-4 mr-1.5" />
-          <span>Upload Evidence</span>
-        </Button>
+          <Button
+            variant="primary"
+            onClick={() => setIsUploadOpen(true)}
+            className="font-mono"
+          >
+            <UploadCloud className="w-3.5 h-3.5 mr-1.5" />
+            <span>Upload Evidence</span>
+          </Button>
+        </div>
       </div>
 
       {notification && (
@@ -167,46 +167,44 @@ export function EvidencePage() {
       )}
 
       {/* Filter and Search Bar */}
-      <Card>
-        <CardContent className="p-4 flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search evidence descriptions, types, or NOS codes..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 rounded-xl border border-slate-200 focus:bg-white focus:border-cyan-500 outline-none transition-all"
-            />
-          </div>
+      <div className="bg-[#050505] border border-white/10 p-4 specular-top-edge flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 absolute left-3 top-3 text-zinc-500" />
+          <input
+            type="text"
+            placeholder="Search evidence descriptions, artifact types, or standard codes..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 text-xs font-mono bg-[#080808] border border-white/15 text-white placeholder-zinc-500 focus:border-white focus:outline-none transition-colors"
+          />
+        </div>
 
-          <div className="w-full sm:w-60">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full py-2 px-3 text-sm bg-slate-50 rounded-xl border border-slate-200 focus:bg-white focus:border-cyan-500 outline-none transition-all"
-            >
-              <option value="">All Verification Statuses</option>
-              <option value="PENDING">Pending Verification</option>
-              <option value="VERIFIED">Verified Valid</option>
-              <option value="REJECTED">Rejected</option>
-              <option value="NEEDS_INFO">Additional Info Required</option>
-            </select>
-          </div>
-        </CardContent>
-      </Card>
+        <div className="w-full sm:w-64">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="w-full py-2 px-3 text-xs font-mono bg-[#080808] border border-white/15 text-white focus:border-white focus:outline-none"
+          >
+            <option value="">All Verification Statuses</option>
+            <option value="PENDING">Pending Review</option>
+            <option value="VERIFIED">Verified</option>
+            <option value="REJECTED">Rejected</option>
+            <option value="NEEDS_INFO">Needs Additional Information</option>
+          </select>
+        </div>
+      </div>
 
-      {/* Evidence Table */}
-      <Card>
+      {/* Monochromatic Evidence Table */}
+      <div className="bg-[#050505] border border-white/10 specular-top-edge">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold text-xs uppercase tracking-wider">
+          <table className="w-full text-left font-mono text-xs">
+            <thead className="bg-[#080808] border-b border-white/15 text-zinc-400 text-[10px] uppercase tracking-wider">
               <tr>
-                <th className="px-6 py-3.5">Artifact / Description</th>
-                <th className="px-6 py-3.5">Type & Target NOS</th>
-                <th className="px-6 py-3.5">Candidate Worker</th>
-                <th className="px-6 py-3.5">Status</th>
-                <th className="px-6 py-3.5 text-right">Assessor Action</th>
+                <th className="px-6 py-3.5 font-semibold">Artifact / Description</th>
+                <th className="px-6 py-3.5 font-semibold">Evidence Type &amp; Standard</th>
+                <th className="px-6 py-3.5 font-semibold">Candidate</th>
+                <th className="px-6 py-3.5 font-semibold">Status</th>
+                <th className="px-6 py-3.5 text-right font-semibold">Assessor Audit</th>
               </tr>
             </thead>
             {isLoading ? (
@@ -218,48 +216,44 @@ export function EvidencePage() {
                     <EmptyState
                       icon={FileCheck2}
                       title="No evidence items found"
-                      description="No candidate evidence records match your criteria. Upload work samples or certificates to get started."
-                      actionLabel="Upload Evidence"
+                      description="No candidate evidence records match your criteria. Upload work samples or certificates to begin."
+                      actionLabel="Submit Evidence"
                       onAction={() => setIsUploadOpen(true)}
                     />
                   </td>
                 </tr>
               </tbody>
             ) : (
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-white/5">
                 {filtered.map((item) => {
                   const Icon = getEvidenceIcon(item.evidence_type);
                   return (
-                    <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
+                    <tr key={item.id} className="hover:bg-white/[0.03] transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-start gap-3">
-                          <div className="w-9 h-9 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center flex-shrink-0 mt-0.5">
-                            <Icon className="w-4 h-4" />
+                          <div className="w-8 h-8 border border-white/15 bg-[#080808] text-white flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <Icon className="w-3.5 h-3.5" />
                           </div>
                           <div>
-                            <div className="font-bold text-slate-900 leading-snug">
-                              {item.description || 'Evidence Submission'}
+                            <div className="font-bold text-white leading-snug">
+                              {item.description || 'Candidate Work Artifact'}
                             </div>
-                            <div className="text-xs text-slate-400 mt-0.5">
-                              ID: #{item.id.slice(0, 8)} • {new Date(item.created_at).toLocaleDateString()}
+                            <div className="text-[10px] text-zinc-500 mt-0.5">
+                              ID: #{item.id.slice(0, 8)} • SUBMITTED: {new Date(item.created_at).toLocaleDateString()}
                             </div>
                           </div>
                         </div>
                       </td>
 
                       <td className="px-6 py-4">
-                        <span className="font-semibold text-slate-700 text-xs px-2 py-0.5 rounded bg-slate-100">
-                          {item.evidence_type}
-                        </span>
-                        {item.nos_id && (
-                          <div className="text-xs text-cyan-700 font-mono font-medium mt-1">
-                            NOS: {item.nos_id}
-                          </div>
-                        )}
+                        <div className="text-zinc-300 font-semibold">{item.evidence_type}</div>
+                        <div className="text-[10px] text-zinc-500 font-mono">
+                          NOS: {item.nos_id || 'UNMAPPED'}
+                        </div>
                       </td>
 
-                      <td className="px-6 py-4 text-xs font-semibold text-slate-800">
-                        Worker #{item.worker_id.slice(0, 8)}...
+                      <td className="px-6 py-4">
+                        <div className="text-zinc-300">ID: {item.worker_id.slice(0, 8)}...</div>
                       </td>
 
                       <td className="px-6 py-4">
@@ -271,9 +265,9 @@ export function EvidencePage() {
                           variant="outline"
                           size="sm"
                           onClick={() => setReviewModal({ isOpen: true, item })}
-                          className="text-xs hover:border-cyan-500 hover:text-cyan-700"
+                          className="font-mono text-[10px]"
                         >
-                          <span>Review & Verify</span>
+                          AUDIT ↗
                         </Button>
                       </td>
                     </tr>
@@ -283,174 +277,148 @@ export function EvidencePage() {
             )}
           </table>
         </div>
-      </Card>
+      </div>
 
-      {/* Upload Evidence Modal */}
+      {/* Upload Modal */}
       <Modal
         isOpen={isUploadOpen}
         onClose={() => setIsUploadOpen(false)}
-        title="Submit Evidence Artifact"
-        description="Upload work samples, job certificates, photos, or supervisor verification letters."
+        title="REGISTER CANDIDATE EVIDENCE"
+        description="Upload photographs, workshop videos, trade logbooks, or employer testimonials."
+        maxWidth="max-w-lg"
       >
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            uploadMutation.mutate();
-          }}
-          className="space-y-4"
-        >
+        <div className="space-y-4">
           <Select
-            label="Select Candidate Worker *"
+            label="Candidate Worker"
             required
             value={uploadData.worker_id}
             onChange={(e) => setUploadData({ ...uploadData, worker_id: e.target.value })}
-            options={[
-              { value: '', label: '-- Select Candidate --' },
-              ...workers.map((w) => ({
-                value: w.id,
-                label: `${w.full_name} (${w.trade || 'General'})`,
-              })),
-            ]}
+            options={workers.map((w) => ({
+              value: w.id,
+              label: `${w.full_name || 'Worker'} (${w.trade || 'General'})`,
+            }))}
           />
 
           <Select
-            label="Evidence Category *"
+            label="Evidence Category"
             value={uploadData.evidence_type}
             onChange={(e) => setUploadData({ ...uploadData, evidence_type: e.target.value })}
             options={[
-              { value: 'WORK_SAMPLE', label: 'Work Sample / Finished Product' },
-              { value: 'PHOTOGRAPH', label: 'Workplace Activity Photograph' },
-              { value: 'CERTIFICATE', label: 'Prior Certificate or Course Record' },
-              { value: 'EXPERIENCE_DECLARATION', label: 'Employer / Supervisor Experience Declaration' },
-              { value: 'VIDEO', label: 'Demonstration Video' },
+              { value: 'WORK_SAMPLE', label: 'Physical Work Sample' },
+              { value: 'PHOTOGRAPH', label: 'Workshop Photograph' },
+              { value: 'VIDEO', label: 'Practical Performance Video' },
+              { value: 'CERTIFICATE', label: 'Prior Certificate / Logbook' },
+              { value: 'TESTIMONIAL', label: 'Employer / Supervisor Testimonial' },
             ]}
           />
 
           <Input
-            label="Description & Context *"
+            label="Target NOS Standard (Optional)"
+            placeholder="e.g. CSC/N0204"
+            value={uploadData.nos_id}
+            onChange={(e) => setUploadData({ ...uploadData, nos_id: e.target.value })}
+          />
+
+          <Input
+            label="Artifact Description"
             required
-            placeholder="e.g. Photograph of candidate welding pressure pipe joint with TIG apparatus."
+            placeholder="e.g. Butt weld tee-joint specimen in 6G position"
             value={uploadData.description}
             onChange={(e) => setUploadData({ ...uploadData, description: e.target.value })}
           />
 
-          <Input
-            label="Target NOS Standard Code (Optional)"
-            placeholder="e.g. CSC/N0204"
-            value={uploadData.nos_id}
-            onChange={(e) => setUploadData({ ...uploadData, nos_id: e.target.value })}
-            helperText="Link directly to a National Occupational Standard if known."
-          />
-
-          {/* File Picker */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-semibold text-slate-700">
-              Attach File Artifact (Optional)
+          <div>
+            <label className="block text-[11px] font-mono text-zinc-300 uppercase tracking-widest mb-1.5">
+              ATTACH FILE ARTIFACT
             </label>
-            <div className="border-2 border-dashed border-slate-300 rounded-xl p-4 text-center hover:border-cyan-400 transition-colors bg-slate-50/50">
-              <input
-                type="file"
-                id="file-upload"
-                className="hidden"
-                onChange={(e) => setFileToUpload(e.target.files[0])}
-              />
-              <label
-                htmlFor="file-upload"
-                className="cursor-pointer flex flex-col items-center justify-center gap-1.5"
-              >
-                <UploadCloud className="w-6 h-6 text-slate-400" />
-                <span className="text-xs font-semibold text-cyan-600">
-                  {fileToUpload ? fileToUpload.name : 'Click to browse or drop file here'}
-                </span>
-                <span className="text-[11px] text-slate-400">
-                  Supports PDF, JPG, PNG, MP4 up to 50MB
-                </span>
-              </label>
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setIsUploadOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              loading={uploadMutation.isPending}
-            >
-              Upload Artifact
-            </Button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Review & Verify Modal */}
-      <Modal
-        isOpen={reviewModal.isOpen}
-        onClose={() => setReviewModal({ isOpen: false, item: null })}
-        title="Verify Candidate Evidence"
-        description={`Item: ${reviewModal.item?.description || 'Artifact'}`}
-      >
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            verifyMutation.mutate({
-              id: reviewModal.item?.id,
-              payload: {
-                verification_status: reviewAction,
-                comments: reviewNotes,
-              },
-            });
-          }}
-          className="space-y-4"
-        >
-          <Select
-            label="Verification Verdict *"
-            value={reviewAction}
-            onChange={(e) => setReviewAction(e.target.value)}
-            options={[
-              { value: 'VERIFIED', label: 'Verified as Authentic & Valid' },
-              { value: 'REJECTED', label: 'Rejected (Inauthentic / Ineligible)' },
-              { value: 'NEEDS_INFO', label: 'Needs Additional Documentation' },
-            ]}
-          />
-
-          <div className="space-y-1.5">
-            <label className="block text-xs font-semibold text-slate-700">
-              Assessor Verification Notes *
-            </label>
-            <textarea
-              required
-              rows={3}
-              placeholder="State basis of verification (e.g. confirmed with employer stamp or observed standard compliance)..."
-              value={reviewNotes}
-              onChange={(e) => setReviewNotes(e.target.value)}
-              className="w-full p-3 text-sm bg-slate-50 rounded-xl border border-slate-200 focus:bg-white focus:border-cyan-500 outline-none transition-all"
+            <input
+              type="file"
+              onChange={(e) => setFileToUpload(e.target.files[0])}
+              className="w-full text-xs font-mono text-zinc-400 file:mr-3 file:py-1.5 file:px-3 file:border file:border-white/20 file:bg-[#0a0a0a] file:text-white file:text-xs file:font-mono file:cursor-pointer"
             />
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+          <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
             <Button
-              type="button"
               variant="outline"
-              onClick={() => setReviewModal({ isOpen: false, item: null })}
+              onClick={() => setIsUploadOpen(false)}
+              className="font-mono text-xs"
             >
-              Cancel
+              CANCEL
             </Button>
             <Button
-              type="submit"
               variant="primary"
-              loading={verifyMutation.isPending}
+              onClick={() => uploadMutation.mutate()}
+              loading={uploadMutation.isPending}
+              className="font-mono text-xs"
             >
-              Commit Verification
+              SUBMIT EVIDENCE ↗
             </Button>
           </div>
-        </form>
+        </div>
+      </Modal>
+
+      {/* Review Modal */}
+      <Modal
+        isOpen={reviewModal.isOpen}
+        onClose={() => setReviewModal({ isOpen: false, item: null })}
+        title="ASSESSOR EVIDENCE AUDIT"
+        description={`Audit candidate item #${reviewModal.item?.id?.slice(0, 8)} against National Occupational Standards.`}
+        maxWidth="max-w-lg"
+      >
+        <div className="space-y-4 font-mono text-xs">
+          <div className="p-3 bg-[#080808] border border-white/10 space-y-1">
+            <div className="text-zinc-400 text-[10px]">DESCRIPTION:</div>
+            <div className="text-white font-bold">{reviewModal.item?.description}</div>
+            <div className="text-zinc-500 text-[10px] pt-1">
+              TYPE: {reviewModal.item?.evidence_type} • NOS: {reviewModal.item?.nos_id || 'UNMAPPED'}
+            </div>
+          </div>
+
+          <Select
+            label="Assessor Verdict"
+            value={reviewAction}
+            onChange={(e) => setReviewAction(e.target.value)}
+            options={[
+              { value: 'VERIFIED', label: 'VERIFIED — Authentic and NOS-Compliant' },
+              { value: 'REJECTED', label: 'REJECTED — Insufficient or Inconclusive' },
+              { value: 'NEEDS_INFO', label: 'NEEDS INFO — Request Secondary Demonstration' },
+            ]}
+          />
+
+          <Input
+            label="Assessor Review Notes"
+            placeholder="e.g. Visual weld bead verified against CSC/N0204 inspection criteria."
+            value={reviewNotes}
+            onChange={(e) => setReviewNotes(e.target.value)}
+          />
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
+            <Button
+              variant="outline"
+              onClick={() => setReviewModal({ isOpen: false, item: null })}
+              className="font-mono text-xs"
+            >
+              CANCEL
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() =>
+                verifyMutation.mutate({
+                  id: reviewModal.item.id,
+                  payload: { verification_status: reviewAction, assessor_notes: reviewNotes },
+                })
+              }
+              loading={verifyMutation.isPending}
+              className="font-mono text-xs"
+            >
+              CONFIRM VERDICT ↗
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );
 }
+
+export default EvidencePage;

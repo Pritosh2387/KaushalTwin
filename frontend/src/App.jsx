@@ -6,6 +6,7 @@ import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { AppLayout } from './components/layout/AppLayout';
 
 // Pages
+import { LandingPage } from './pages/landing/LandingPage';
 import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import { DashboardPage } from './pages/dashboard/DashboardPage';
@@ -36,29 +37,34 @@ export default function App() {
       <AuthProvider>
         <BrowserRouter>
           <Routes>
+            {/* Cinematic Hero Landing Page */}
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/hero" element={<LandingPage />} />
+
             {/* Public Auth Routes */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
 
             {/* Authenticated Application Shell */}
             <Route
-              path="/"
               element={
                 <ProtectedRoute>
                   <AppLayout />
                 </ProtectedRoute>
               }
             >
-              <Route index element={<DashboardPage />} />
-              <Route path="workers" element={<WorkersPage />} />
-              <Route path="workers/:id" element={<WorkerDetailPage />} />
-              <Route path="assessments" element={<AssessmentsPage />} />
-              <Route path="assessments/:id" element={<AssessmentWorkspacePage />} />
-              <Route path="evidence" element={<EvidencePage />} />
-              <Route path="competencies" element={<CompetenciesPage />} />
-              <Route path="reports" element={<ReportsPage />} />
-              <Route path="audit" element={<AuditPage />} />
-              <Route path="settings" element={<SettingsPage />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/overview" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/app" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/workers" element={<WorkersPage />} />
+              <Route path="/workers/:id" element={<WorkerDetailPage />} />
+              <Route path="/assessments" element={<AssessmentsPage />} />
+              <Route path="/assessments/:id" element={<AssessmentWorkspacePage />} />
+              <Route path="/evidence" element={<EvidencePage />} />
+              <Route path="/competencies" element={<CompetenciesPage />} />
+              <Route path="/reports" element={<ReportsPage />} />
+              <Route path="/audit" element={<AuditPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
             </Route>
 
             {/* Fallback */}

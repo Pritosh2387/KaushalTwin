@@ -58,7 +58,13 @@ async def get_current_user(
     if not user_id_str:
         raise credentials_exception
 
-    user_doc = await db.users.find_one({"id": user_id_str})
+    queries = [{"id": user_id_str}]
+    try:
+        queries.append({"id": uuid.UUID(user_id_str)})
+    except Exception:
+        pass
+
+    user_doc = await db.users.find_one({"$or": queries})
     if user_doc is None:
         raise credentials_exception
 

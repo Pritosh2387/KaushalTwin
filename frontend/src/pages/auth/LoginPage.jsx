@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Sparkles, Shield, AlertCircle, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Shield, ArrowRight, Compass } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Alert } from '../../components/ui/Alert';
@@ -16,7 +16,7 @@ export function LoginPage() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const from = location.state?.from?.pathname || '/';
+  const from = location.state?.from?.pathname || '/dashboard';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -51,38 +51,35 @@ export function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden">
-      {/* Decorative ambient background */}
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
+    <div className="min-h-screen bg-[#000000] flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden select-none">
+      {/* Background ambient grid */}
+      <div className="absolute inset-0 obsidian-grid opacity-30 pointer-events-none" />
 
-      <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
-        <div className="flex items-center justify-center gap-3 mb-4">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-cyan-400 to-teal-300 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-            <Sparkles className="w-6 h-6 text-navy-950 font-bold" />
+      <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10 px-4 sm:px-0">
+        {/* Brand Header */}
+        <div className="flex flex-col items-center text-center mb-8">
+          <div className="w-10 h-10 border border-white/30 bg-[#080808] flex items-center justify-center rotate-45 mb-4 shadow-[0_0_20px_rgba(255,255,255,0.1)]">
+            <div className="w-4 h-4 bg-white -rotate-45" />
           </div>
-          <div>
-            <h1 className="text-2xl font-black text-white tracking-tight flex items-center gap-2">
-              KaushalTwin
-              <span className="text-xs uppercase font-bold px-2 py-0.5 rounded bg-cyan-400/20 text-cyan-300 border border-cyan-400/30">
-                SIH 2026
-              </span>
-            </h1>
-            <p className="text-xs text-slate-400 font-medium">
-              AI-Assisted RPL Skill Assessment Platform
-            </p>
-          </div>
+          <h1 className="text-xl font-mono font-bold text-white tracking-widest uppercase flex items-center gap-2">
+            KAUSHALTWIN
+            <span className="text-[10px] font-mono px-1.5 py-0.5 bg-white/10 text-white border border-white/20">
+              RPL
+            </span>
+          </h1>
+          <p className="text-xs text-zinc-400 font-sans mt-1 tracking-wider uppercase">
+            Skill Intelligence Platform
+          </p>
         </div>
-      </div>
 
-      <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md relative z-10 px-4 sm:px-0">
-        <div className="bg-white py-8 px-6 shadow-2xl rounded-2xl sm:px-10 border border-slate-100">
+        {/* Crystalline Login Panel */}
+        <div className="bg-[#050505] py-8 px-6 sm:px-10 border border-white/15 specular-top-edge">
           <div className="mb-6">
-            <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-              Sign in to your account
+            <h2 className="text-sm font-sans font-bold text-white uppercase tracking-wider">
+              Sign In to Your Account
             </h2>
-            <p className="text-xs text-slate-500 mt-1">
-              Access the Recognition of Prior Learning (RPL) assessment console
+            <p className="text-xs text-zinc-400 font-light mt-1">
+              Enter credentials to access the Recognition of Prior Learning assessment portal.
             </p>
           </div>
 
@@ -98,7 +95,7 @@ export function LoginPage() {
               type="email"
               autoComplete="email"
               required
-              placeholder="e.g. assessor@kaushaltwin.gov.in"
+              placeholder="assessor@kaushaltwin.gov.in"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
@@ -117,59 +114,58 @@ export function LoginPage() {
               <Button
                 type="submit"
                 variant="primary"
-                className="w-full justify-center py-2.5 text-sm"
+                className="w-full justify-center py-3 font-mono text-xs tracking-wider uppercase"
                 loading={loading}
               >
-                <span>Sign in to Assessment Portal</span>
-                <ArrowRight className="w-4 h-4 ml-1" />
+                <span>Sign In ↗</span>
               </Button>
             </div>
           </form>
 
-          {/* Quick Demo Pre-fill for SIH Evaluation */}
-          <div className="mt-6 pt-6 border-t border-slate-100">
-            <p className="text-xs font-semibold text-slate-600 mb-2">
-              Demo Credentials (SIH Evaluator Quick Access):
+          {/* Quick Demo Pre-fill for Hackathon Evaluators */}
+          <div className="mt-6 pt-6 border-t border-white/10">
+            <p className="text-[10px] font-sans uppercase text-zinc-400 tracking-wider mb-2.5">
+              Quick Demo Accounts:
             </p>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => handleDemoFill('assessor@kaushaltwin.gov.in', 'assessor123')}
-                className="text-left px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-cyan-400 hover:bg-cyan-50/50 transition-colors text-xs text-slate-700 font-medium"
+                className="text-left p-2.5 bg-[#080808] border border-white/10 hover:border-white/30 transition-colors text-xs cursor-pointer"
               >
-                <div className="font-bold text-slate-900">Lead Assessor</div>
-                <div className="text-[10px] text-slate-500">assessor123</div>
+                <div className="font-sans font-bold text-white text-[11px]">Lead Assessor</div>
+                <div className="font-mono text-[10px] text-zinc-400">assessor123</div>
               </button>
               <button
                 type="button"
                 onClick={() => handleDemoFill('admin@kaushaltwin.gov.in', 'admin123')}
-                className="text-left px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-cyan-400 hover:bg-cyan-50/50 transition-colors text-xs text-slate-700 font-medium"
+                className="text-left p-2.5 bg-[#080808] border border-white/10 hover:border-white/30 transition-colors text-xs cursor-pointer"
               >
-                <div className="font-bold text-slate-900">System Admin</div>
-                <div className="text-[10px] text-slate-500">admin123</div>
+                <div className="font-sans font-bold text-white text-[11px]">Administrator</div>
+                <div className="font-mono text-[10px] text-zinc-400">admin123</div>
               </button>
             </div>
           </div>
 
-          <div className="mt-6 text-center">
-            <p className="text-xs text-slate-500">
-              Don't have an account?{' '}
-              <Link
-                to="/register"
-                className="font-semibold text-cyan-600 hover:text-cyan-700 hover:underline"
-              >
-                Register as Worker / Assessor
-              </Link>
-            </p>
+          <div className="mt-6 text-center border-t border-white/5 pt-4">
+            <Link
+              to="/"
+              className="text-xs font-sans text-zinc-400 hover:text-white flex items-center justify-center gap-1.5 tracking-wider transition-colors"
+            >
+              <Compass className="w-3.5 h-3.5" />
+              <span>← Return to Home Page</span>
+            </Link>
           </div>
         </div>
 
-        {/* Security & Human Assessor Banner */}
-        <div className="mt-6 flex items-center justify-center gap-2 text-xs text-slate-400 text-center">
-          <Shield className="w-4 h-4 text-cyan-400" />
-          <span>NCVET/NSQF Aligned • Human-Certified Decision Workflow</span>
+        {/* Security & Governance notice */}
+        <div className="mt-6 flex items-center justify-center gap-2 text-[10px] font-sans text-zinc-500 uppercase tracking-widest text-center">
+          <Shield className="w-3.5 h-3.5 text-zinc-400" />
+          <span>Secure Assessor Governance</span>
         </div>
       </div>
     </div>
   );
 }
+
+export default LoginPage;

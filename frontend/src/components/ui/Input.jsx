@@ -22,14 +22,14 @@ export const Input = forwardRef(function Input(
       {label && (
         <label
           htmlFor={inputId}
-          className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5"
+          className="block text-[11px] font-mono text-zinc-300 uppercase tracking-widest mb-1.5"
         >
-          {label} {required && <span className="text-rose-500">*</span>}
+          {label} {required && <span className="text-zinc-500">*</span>}
         </label>
       )}
-      <div className="relative rounded-lg shadow-xs">
+      <div className="relative">
         {Icon && (
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-zinc-500">
             <Icon className="h-4 w-4" />
           </div>
         )}
@@ -38,22 +38,22 @@ export const Input = forwardRef(function Input(
           id={inputId}
           className={twMerge(
             clsx(
-              'block w-full rounded-lg border text-sm transition-colors duration-150',
-              'placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-offset-0',
+              'block w-full rounded-none border text-sm transition-all duration-150',
+              'placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-white/20',
               Icon ? 'pl-9 pr-3' : 'px-3',
               'py-2',
               error
-                ? 'border-rose-300 text-rose-900 focus:border-rose-500 focus:ring-rose-200 bg-rose-50/20'
-                : 'border-slate-300 text-slate-900 focus:border-navy-700 focus:ring-navy-100 bg-white hover:border-slate-400',
+                ? 'border-zinc-400 text-white focus:border-white bg-[#080808]'
+                : 'border-white/15 text-white focus:border-white bg-[#050505] hover:border-white/30',
               className
             )
           )}
           {...props}
         />
       </div>
-      {error && <p className="mt-1.5 text-xs text-rose-600 font-medium">{error}</p>}
+      {error && <p className="mt-1.5 text-xs text-zinc-400 font-mono">{error}</p>}
       {!error && helperText && (
-        <p className="mt-1.5 text-xs text-slate-500">{helperText}</p>
+        <p className="mt-1.5 text-xs text-zinc-500 font-light">{helperText}</p>
       )}
     </div>
   );
