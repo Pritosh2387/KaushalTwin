@@ -145,17 +145,21 @@ async def preprocess_text(text: str, language: str = "en") -> dict:
 
 async def extract_skills(text: str, language: str = "en", trade: str = "electrician") -> dict:
     """POST /api/v1/ml/skills/extract"""
+    # Determine provider based on configuration
+    provider = "demo" if settings.uses_demo_skill_provider else "llm"
     return await _post(
         "/api/v1/ml/skills/extract",
-        {"text": text, "language": language, "trade": trade, "provider": "demo"},
+        {"text": text, "language": language, "trade": trade, "provider": provider},
     )
 
 
 async def map_skills_to_nos(skills: list[dict], top_k: int = 3) -> dict:
     """POST /api/v1/ml/nos/map"""
+    # Determine embedding provider based on configuration
+    embedding_provider = "demo" if settings.uses_demo_embedding_provider else "sentence_transformer"
     return await _post(
         "/api/v1/ml/nos/map",
-        {"skills": skills, "top_k": top_k, "embedding_provider": "demo"},
+        {"skills": skills, "top_k": top_k, "embedding_provider": embedding_provider},
     )
 
 

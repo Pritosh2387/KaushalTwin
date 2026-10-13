@@ -19,6 +19,7 @@ from ml.services.exceptions import (
     MLProviderError,
     InvalidInputError,
 )
+from app.core.config import settings
 
 # ---------------------------------------------------------------------------
 # NOS repository
@@ -71,10 +72,12 @@ def extract_skills(
     text: str,
     language: str = "en",
     trade: str = "electrician",
-    provider_name: str = "demo",
-    api_key: str = "",
 ) -> SkillExtractionResponse:
     """Extract skills from a worker transcript."""
+    # Use centralized configuration for provider selection
+    provider_name = "llm" if settings.SKILL_EXTRACTION_PROVIDER == "llm" and settings.LLM_SKILL_API_KEY else "demo"
+    api_key = settings.LLM_SKILL_API_KEY if provider_name == "llm" else ""
+
     try:
         provider = get_skill_extraction_provider(provider_name, api_key=api_key)
         skills = provider.extract_skills(text, language=language, trade=trade)
@@ -99,7 +102,6 @@ def extract_skills(
 def map_skills_to_nos(
     skills: list[dict],
     top_k: int = 3,
-    embedding_provider_name: str = "demo",
 ) -> List[dict]:
     """
     Map each extracted skill to candidate NOS elements.
@@ -107,6 +109,9 @@ def map_skills_to_nos(
     Uses hybrid scoring: exact match + keyword overlap + TF-IDF + embedding.
     Returns CANDIDATE mappings only — never certified.
     """
+    # Use centralized configuration for embedding provider selection
+    embedding_provider_name = "sentence_transformer" if settings.EMBEDDING_PROVIDER == "sentence_transformer" else "demo"
+
     try:
         nos_list, nos_embs = _nos_embedding_corpus(embedding_provider_name)
         emb_provider = get_embedding_provider(embedding_provider_name)
@@ -155,8 +160,11 @@ def map_skills_to_nos(
         raise NOSMappingError(f"NOS mapping failed: {str(exc)}") from exc
 
 
-def search_nos(query: str, top_k: int = 5, embedding_provider_name: str = "demo") -> List[dict]:
+def search_nos(query: str, top_k: int = 5) -> List[dict]:
     """Free-text search across the NOS repository."""
+    # Use centralized configuration for embedding provider selection
+    embedding_provider_name = "sentence_transformer" if settings.EMBEDDING_PROVIDER == "sentence_transformer" else "demo"
+
     try:
         nos_list, nos_embs = _nos_embedding_corpus(embedding_provider_name)
         emb_provider = get_embedding_provider(embedding_provider_name)

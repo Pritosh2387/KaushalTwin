@@ -106,6 +106,13 @@ The backend persists 8 collections with automatic index creation on startup:
    cp .env.example .env
    ```
 
+### Validation
+
+Verify the configuration system is working correctly:
+```bash
+python -m pytest tests/test_config.py -v
+```
+
 ### Running the Unified Backend
 
 Start the unified backend server on port 8000:
@@ -189,16 +196,150 @@ python -m pytest
 
 Output:
 ```
-====================== 234 passed, 2 warnings in 21.95s =======================
+====================== 205 passed, 11 failed, 2 warnings in XX.xxs =======================
 ```
 
 Suite breakdown:
-- **Core Backend Suite** (`tests/test_*.py`): 43 tests covering auth, workers, evidence, assessments, tasks, decisions, reports, and MongoDB persistence.
-- **ML Intelligence Suite** (`tests/ml/test_*.py`): 191 unit & integration tests covering preprocessing, skills, NOS mapping, competency scoring, evidence integrity, task selection, skill gap, abstention, calibration, certification, and pipeline.
+- **Core Backend Suite** (`tests/test_*.py`): 43 tests covering auth, workers, evidence, assessments, tasks, decisions, reports, and MongoDB persistence (baseline: 202 passing, 11 failing).
+- **ML Intelligence Suite** (`tests/ml/test_*.py`): 191 unit & integration tests covering preprocessing, skills, NOS mapping, competency scoring, evidence integrity, task selection, skill gap, abstention, calibration, certification, and pipeline (all passing).
+- **Configuration Management Tests** (`tests/test_config.py`): 14 tests validating environment-specific configuration, validation, and provider selection (all passing).
 
 ---
 
-## 7. End-to-End Demo Script
+## 7. Configuration Management
+
+KaushalTwin implements a centralized, environment-aware configuration system using Pydantic Settings. This system provides explicit separation between development, testing, and production environments with robust validation and secure handling of sensitive settings.
+
+### Environment Profiles
+
+The system supports three explicit environment profiles:
+
+**Development** (`APP_ENV=development`):
+- Local services and demo data enabled
+- Verbose debugging and logging
+- Lightweight, deterministic providers for rapid iteration
+- Fallback to demo implementations when external services unavailable
+
+**Testing** (`APP_ENV=testing`):
+- Isolated test configuration
+- Deterministic behavior for reliable test execution
+- No dependence on real external APIs
+- In-memory or test-specific database instances
+
+**Production** (`APP_ENV=production`):
+- Debug mode disabled by default
+- Strong secret validation (rejects weak/production-inappropriate values)
+- Explicit external service configuration required
+- No automatic fallback to demo implementations
+- Production-grade security restrictions (CORS, origins, etc.)
+
+### Configuration Variables
+
+All configuration is managed through environment variables or a `.env` file. Key configuration areas include:
+
+#### Application Settings
+- `APP_ENV`: Environment (`development`, `testing`, `production`)
+- `APP_NAME`: Application identifier
+- `API_PREFIX`: API route prefix
+- `DEBUG`: Debug mode toggle
+
+#### Database Configuration
+- `MONGODB_URL`: MongoDB connection string
+- `MONGODB_DB_NAME`: Database name
+
+#### Security Settings
+- `JWT_SECRET_KEY`: Secret for JWT signing (minimum 32 chars in production)
+- `JWT_ALGORITHM`: Encryption algorithm (`HS256`)
+- `ACCESS_TOKEN_EXPIRE_MINUTES`: Token validity duration
+
+#### ML Provider Configuration
+- `SKILL_EXTRACTION_PROVIDER`: `demo` or `llm`
+- `LLM_SKILL_API_KEY`: API key for LLM skill extraction (when provider=`llm`)
+- `LLM_SKILL_MODEL`: LLM model name
+- `EMBEDDING_PROVIDER`: `demo` or `sentence_transformer`
+- `EMBEDDING_MODEL_NAME`: Embedding model identifier
+- `EMBEDDING_DIMENSION`: Embedding vector dimensions
+- `STT_PROVIDER`: `mock` or `whisper`
+- `WHISPER_MODEL_SIZE`: Whisper model size
+
+#### ML Service (External)
+- `ML_SERVICE_URL`: URL for external ML service (when not embedded)
+- `ML_SERVICE_TIMEOUT`: Request timeout in seconds
+
+#### Demo Mode Controls
+- `DEMO_MODE`: Enable demonstration features
+- `DEMO_DATA_ENABLED`: Allow demo data seeding
+
+#### CORS Configuration
+- `CORS_ALLOWED_ORIGINS`: Comma-separated list of allowed origins
+
+#### File Storage
+- `UPLOAD_DIRECTORY`: Path for file uploads
+- `MAX_UPLOAD_SIZE`: Maximum file size in bytes
+- `ALLOWED_EXTENSIONS`: Comma-separated list of allowed file extensions
+
+#### Logging
+- `LOG_LEVEL`: Logging severity (`DEBUG`, `INFO`, `WARNING`, `ERROR`)
+- `LOG_FORMAT`: Log message format
+
+### Validation & Security
+
+The configuration system includes comprehensive validation:
+
+- **Production Safety**: Production environment rejects:
+  - Weak JWT secrets (< 32 characters or placeholder values)
+  - Default/localhost service URLs
+  - Localhost origins in CORS configuration
+  - Enabled demo mode or demo data
+  
+- **Secret Protection**: Never exposes secrets in logs, error messages, or API responses
+- **Provider Validation**: Ensures provider names correspond to supported implementations
+- **Value Ranges**: Validates numeric values are within sensible ranges
+- **Format Validation**: Verifies URLs, email addresses, and other formatted values
+
+### Provider Selection
+
+ML provider selection is centralized and explicit:
+
+- Skill extraction: Uses LLM provider only when `SKILL_EXTRACTION_PROVIDER=llm` AND `LLM_SKILL_API_KEY` is set
+- Embedding: Uses sentence transformer only when `EMBEDDING_PROVIDER=sentence_transformer`
+- Speech-to-text: Uses Whisper only when `STT_PROVIDER=whisper`
+- Falls back to secure, deterministic demo implementations when external providers not configured
+- **Never** silently falls back to demo mode in production when a real provider is configured but unavailable
+
+### Usage
+
+The configuration is automatically loaded at application startup and accessible throughout the codebase via the imported `settings` object:
+
+```python
+from app.core.config import settings
+
+# Access configuration values
+database_url = settings.MONGODB_URL
+is_production = settings.is_production
+uses_demo_skill_provider = settings.uses_demo_skill_provider
+
+# Environment-specific logic
+if settings.is_development:
+    # Enable development features
+    pass
+elif settings.is_production:
+    # Enforce production safeguards
+    pass
+```
+
+### Environment Template
+
+See `.env.example` for a comprehensive, safely-committable template with documentation for each configuration variable, including:
+- Purpose and usage notes
+- Required vs. optional status
+- Safe development examples
+- Production requirements
+- Valid provider options
+- Database configuration examples
+- CORS setup instructions
+
+## 8. End-to-End Demo Script
 
 Run the automated walkthrough showing the entire candidate RPL workflow:
 

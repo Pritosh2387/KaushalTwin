@@ -42,13 +42,13 @@ def extract_skills_endpoint(request: SkillExtractionRequest) -> SkillExtractionR
     - Works in DEMO MODE with no API keys.
     - Confidence values are deterministic (not random).
     - Supports Hindi, English, and Hinglish input.
+    - Provider selection is centralized in configuration.
     """
     try:
         return extract_skills(
             text=request.text,
             language=request.language,
             trade=request.trade,
-            provider_name=request.provider,
         )
     except Exception as exc:
         raise HTTPException(
@@ -72,13 +72,13 @@ def map_nos_endpoint(request: NOSMappingRequest) -> NOSMappingResponse:
 
     Returns CANDIDATE MAPPINGS ONLY — never auto-certified.
     Human assessor confirmation is required before use in assessment.
+    - Provider selection is centralized in configuration.
     """
     try:
         skills_raw = [s.model_dump() for s in request.skills]
         mappings = map_skills_to_nos(
             skills=skills_raw,
             top_k=request.top_k,
-            embedding_provider_name=request.embedding_provider,
         )
         parsed = []
         for m in mappings:
@@ -107,7 +107,6 @@ def search_nos_endpoint(request: NOSSearchRequest) -> NOSSearchResponse:
     results = search_nos(
         query=request.query,
         top_k=request.top_k,
-        embedding_provider_name=request.embedding_provider,
     )
     return NOSSearchResponse(
         results=[NOSSearchResult(**r) for r in results],

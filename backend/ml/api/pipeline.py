@@ -114,7 +114,6 @@ def run_pipeline(request: PipelineRequest) -> PipelineResponse:
             text=pre.normalized_text,
             language=pre.language,
             trade=request.trade,
-            provider_name="demo",
         )
         skills = [s.model_dump() for s in skill_result.skills]
 
