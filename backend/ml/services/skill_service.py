@@ -50,6 +50,36 @@ def invalidate_nos_cache() -> None:
     _nos_repository.clear_cache()
 
 
+def set_active_nos_dataset(source: Union[str, Path, None] = None) -> Dict[str, Any]:
+    """
+    Switch the active NOS dataset in the repository and invalidate embedding caches.
+
+    Args:
+        source: 'official', 'demo', a specific Path / string path, or None for default
+
+    Returns:
+        Dataset information dictionary
+    """
+    global _nos_embeddings_cache, _last_dataset_hash, _last_dataset_source
+    _nos_embeddings_cache = None
+    _last_dataset_hash = None
+    _last_dataset_source = None
+
+    if source is None or str(source).lower() == "demo":
+        _nos_repository.load_demo_data(refresh=True)
+    elif str(source).lower() == "official":
+        _nos_repository.load_official_data(refresh=True)
+    else:
+        _nos_repository.load_nos_data(source, refresh=True)
+
+    return _nos_repository.get_dataset_info()
+
+
+def get_active_nos_dataset_info() -> Dict[str, Any]:
+    """Return dataset metadata and status for the currently active NOS repository."""
+    return _nos_repository.get_dataset_info()
+
+
 def _load_nos() -> list[dict]:
     """Load NOS data from the repository."""
     return _nos_repository.get_all_nos()

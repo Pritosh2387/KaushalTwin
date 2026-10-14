@@ -46,8 +46,9 @@ export const evidenceApi = {
   },
 
   getDownloadUrl: (evidenceId) => {
-    const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-    return `${base}/api/v1/evidence/${evidenceId}/download`;
+    const rawBase = apiClient.defaults.baseURL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+    const cleanBase = rawBase.replace(/\/+$/, '').replace(/\/api\/v1$/, '');
+    return `${cleanBase}/api/v1/evidence/${evidenceId}/download`;
   },
 
   // Compatibility aliases

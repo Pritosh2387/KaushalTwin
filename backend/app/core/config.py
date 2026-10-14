@@ -62,7 +62,7 @@ class Settings(BaseSettings):
     DEMO_DATA_ENABLED: bool = False
 
     # ── CORS ─────────────────────────────────────────────────────────────────
-    CORS_ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
+    CORS_ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173,http://localhost:5174,http://127.0.0.1:3000,http://127.0.0.1:5173"
 
     # ── File Storage ─────────────────────────────────────────────────────────
     UPLOAD_DIRECTORY: str = "./uploads"

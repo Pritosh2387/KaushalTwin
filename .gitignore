@@ -122,4 +122,8 @@ secret*
 *.log
 *.sqlite3
 *.db
-!demo.sqlite3
+!demo.sqlite3.env.*
+!**/.env.example
+
+# Keep downloaded NQR HTML snapshots local
+backend/ml/data/raw/nqr/*.html

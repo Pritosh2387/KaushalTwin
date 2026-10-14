@@ -510,7 +510,7 @@ async def analyze_assessment(
             claim=body.claim_for_explanation,
         )
 
-        cert_rec = pipeline_result.get("certification_recommendation", {})
+        cert_rec = pipeline_result.get("certification_recommendation") or {}
         recommendation_str = cert_rec.get("recommendation") or "REQUIRES_ASSESSOR_REVIEW"
 
         now = datetime.now(timezone.utc)
@@ -706,11 +706,22 @@ async def check_evidence_sufficiency(
     ]
 
     try:
-        ev_analysis = await ml_analyze_evidence(evidence_records)
+        ev_analysis = (
+            await ml_analyze_evidence(evidence_records)
+            if evidence_records
+            else {
+                "source_features": [],
+                "support_score": 0.0,
+                "contradict_score": 0.0,
+                "independent_sources": 0,
+                "conflict": False,
+                "conflict_reason": None,
+            }
+        )
         abs_check = await ml_check_abstention(
             worker_id=str(assessment.worker_id),
             competencies=competencies,
-            evidence_records=evidence_records,
+            evidence_records=evidence_records if evidence_records else None,
         )
     except MLServiceError as exc:
         raise HTTPException(

@@ -127,13 +127,13 @@ export function LoginPage() {
             <p className="text-[10px] font-sans uppercase text-zinc-400 tracking-wider mb-2.5">
               Quick Demo Accounts:
             </p>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => handleDemoFill('assessor@kaushaltwin.gov.in', 'assessor123')}
                 className="text-left p-2.5 bg-[#080808] border border-white/10 hover:border-white/30 transition-colors text-xs cursor-pointer"
               >
-                <div className="font-sans font-bold text-white text-[11px]">Lead Assessor</div>
+                <div className="font-sans font-bold text-white text-[11px]">Assessor</div>
                 <div className="font-mono text-[10px] text-zinc-400">assessor123</div>
               </button>
               <button
@@ -141,8 +141,16 @@ export function LoginPage() {
                 onClick={() => handleDemoFill('admin@kaushaltwin.gov.in', 'admin123')}
                 className="text-left p-2.5 bg-[#080808] border border-white/10 hover:border-white/30 transition-colors text-xs cursor-pointer"
               >
-                <div className="font-sans font-bold text-white text-[11px]">Administrator</div>
+                <div className="font-sans font-bold text-white text-[11px]">Admin</div>
                 <div className="font-mono text-[10px] text-zinc-400">admin123</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDemoFill('worker@kaushaltwin.gov.in', 'worker123')}
+                className="text-left p-2.5 bg-[#080808] border border-white/10 hover:border-white/30 transition-colors text-xs cursor-pointer"
+              >
+                <div className="font-sans font-bold text-white text-[11px]">Worker</div>
+                <div className="font-mono text-[10px] text-zinc-400">worker123</div>
               </button>
             </div>
           </div>

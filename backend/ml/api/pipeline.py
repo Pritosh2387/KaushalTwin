@@ -165,6 +165,36 @@ def run_pipeline(request: PipelineRequest) -> PipelineResponse:
                 }
             else:
                 twin = build_competency_twin(request.worker_id, request.competencies)
+        elif nos_mappings:
+            competencies = []
+            seen_nos = set()
+            for m in nos_mappings:
+                for c in m.get("candidates", []):
+                    nos_id = c.get("nos_id")
+                    if nos_id and nos_id not in seen_nos:
+                        seen_nos.add(nos_id)
+                        competencies.append({
+                            "nos_id": nos_id,
+                            "title": c.get("title", ""),
+                            "competency_score": round(float(c.get("similarity", 0.7)) * 100, 1),
+                            "evidence_coverage": 0.5,
+                            "evidence_confidence": 0.6,
+                            "mandatory": c.get("mandatory", True),
+                            "importance": c.get("weight", 1.0),
+                            "weight": c.get("weight", 1.0),
+                            "status": "UNASSESSED",
+                        })
+            mandatory_states = [c for c in competencies if c.get("mandatory", False)]
+            twin = {
+                "worker_id": request.worker_id,
+                "competencies": competencies,
+                "summary": {
+                    "total_nos": len(competencies),
+                    "mandatory_nos": len(mandatory_states),
+                    "all_mandatory_assessed": False,
+                    "mandatory_coverage_mean": 0.5,
+                },
+            }
         else:
             twin = {"worker_id": request.worker_id, "competencies": [], "summary": {}}
 

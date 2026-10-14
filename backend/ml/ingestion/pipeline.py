@@ -977,10 +977,10 @@ def main():
     import sys
 
     parser = argparse.ArgumentParser(description='KaushalTwin NOS/QP Data Ingestion Pipeline')
-    parser.add_argument('command', choices=['ingest', 'validate', 'report'],
+    parser.add_argument('command', choices=['ingest', 'validate', 'report', 'acquire'],
                        help='Command to execute')
-    parser.add_argument('--input', '-i', required=True,
-                       help='Input file path (JSON or CSV)')
+    parser.add_argument('--input', '-i', required=False,
+                       help='Input file path (JSON or CSV), required for ingest/validate/report')
     parser.add_argument('--output', '-o',
                        help='Output file path for normalized data')
     parser.add_argument('--format', '-f', choices=['json', 'csv'],
@@ -1046,6 +1046,9 @@ def main():
         source_metadata['verification_method'] = args.verification_method
     if args.attestation_token:
         source_metadata['attestation_signature'] = args.attestation_token
+
+    if args.command in ['ingest', 'validate', 'report'] and not args.input:
+        parser.error(f"--input is required for the '{args.command}' command")
 
     try:
         if args.command == 'ingest':
@@ -1174,6 +1177,28 @@ def main():
                 print(f"\nUpdated dataset saved to: {output_path}")
 
             return 0
+
+        elif args.command == 'acquire':
+            from ml.ingestion.acquisition import NQRAcquisitionService
+            output_file = args.output or Path(__file__).parent.parent / "data" / "official_nos.json"
+            reviewer_id = args.attested_by or "ncvet_admin_01"
+            service = NQRAcquisitionService()
+            summary = service.acquire_official_dataset(
+                output_file=output_file,
+                reviewer_id=reviewer_id
+            )
+            print("\n=== OFFICIAL NOS ACQUISITION REPORT ===")
+            print(f"Status: {summary['status']}")
+            print(f"Qualifications acquired: {summary['qualifications_acquired']}")
+            print(f"Total NOS records: {summary['total_records']}")
+            print(f"Valid records: {summary['valid_records']}")
+            print(f"Provenance verified: {summary['provenance_verified']}")
+            print(f"Trades covered: {summary['trades_covered']}")
+            print(f"Output dataset: {summary['output_file']}")
+            print(f"Raw artifacts ({len(summary['raw_artifacts'])} files):")
+            for raw_f in summary['raw_artifacts']:
+                print(f"  {raw_f}")
+            return 0 if summary['valid_records'] > 0 else 1
 
     except Exception as e:
         logger.error(f"Error during pipeline execution: {e}")

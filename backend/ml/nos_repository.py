@@ -27,6 +27,48 @@ class NOSRepository:
         self._metadata: Dict[str, Any] = {}
         # Path to default demo data for backward compatibility
         self._demo_data_path = Path(__file__).parent / "data" / "demo_nos.json"
+        # Path to official data acquired from government sources
+        self._official_data_path = Path(__file__).parent / "data" / "official_nos.json"
+
+    def load_official_data(self, refresh: bool = False) -> List[Dict[str, Any]]:
+        """
+        Load official NOS dataset if present, with graceful fallback to demo if missing.
+
+        Returns:
+            List of official NOS records as dictionaries
+        """
+        if not self._official_data_path.exists():
+            logger.warning(
+                f"Official NOS data file not found at {self._official_data_path}; falling back to demo data."
+            )
+            return self.load_demo_data(refresh=refresh)
+        return self.load_nos_data(self._official_data_path, source_type="OFFICIAL", refresh=refresh)
+
+    def load_demo_data(self, refresh: bool = False) -> List[Dict[str, Any]]:
+        """
+        Load synthetic demo NOS dataset.
+
+        Returns:
+            List of demo NOS records as dictionaries
+        """
+        return self.load_nos_data(self._demo_data_path, source_type="DEMO", refresh=refresh)
+
+    def set_active_dataset(self, dataset_type: str) -> List[Dict[str, Any]]:
+        """
+        Explicitly set active dataset to 'official' or 'demo'.
+
+        Args:
+            dataset_type: 'official' or 'demo'
+
+        Returns:
+            Loaded records
+        """
+        if dataset_type.lower() == "official":
+            return self.load_official_data(refresh=True)
+        elif dataset_type.lower() == "demo":
+            return self.load_demo_data(refresh=True)
+        else:
+            raise ValueError(f"Unknown dataset_type: '{dataset_type}'. Expected 'official' or 'demo'.")
 
     def load_nos_data(self,
                      data_source: Union[str, Path],

@@ -18,7 +18,7 @@ class CompetencyStateInput(BaseModel):
     weight: float = Field(1.0, ge=0.0, le=2.0, description="Alias for importance")
     evidence_confidence: Optional[float] = Field(None, ge=0.0, le=1.0)
     evidence_coverage: float = Field(0.0, ge=0.0, le=1.0)
-    competency_score: int = Field(0, ge=0, le=100)
+    competency_score: float = Field(0.0, ge=0.0, le=100.0)
 
 
 # ---------------------------------------------------------------------------

@@ -20,6 +20,7 @@ from ml.api.abstention import router as abstention_router
 from ml.api.calibration import router as calibration_router
 from ml.api.certification import router as certification_router
 from ml.api.explainability import router as explainability_router
+from ml.api.evaluation import router as evaluation_router
 
 # ---------------------------------------------------------------------------
 # App instance
@@ -101,6 +102,7 @@ app.include_router(abstention_router, prefix=PREFIX)
 app.include_router(calibration_router, prefix=PREFIX)
 app.include_router(certification_router, prefix=PREFIX)
 app.include_router(explainability_router, prefix=PREFIX)
+app.include_router(evaluation_router, prefix=PREFIX)
 
 # ---------------------------------------------------------------------------
 # Health check

@@ -50,6 +50,7 @@ from ml.api.abstention import router as ml_abstention_router
 from ml.api.calibration import router as ml_calibration_router
 from ml.api.certification import router as ml_certification_router
 from ml.api.explainability import router as ml_explainability_router
+from ml.api.evaluation import router as ml_evaluation_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -69,6 +70,19 @@ async def lifespan(app: FastAPI):
 
     # Initialise MongoDB connection pool & ensure indexes
     await connect_to_mongo()
+
+    # Auto-seed demo accounts in development or demo mode if database is empty
+    if settings.is_development or settings.DEMO_MODE or settings.DEMO_DATA_ENABLED:
+        try:
+            from app.db.mongodb import mongo_manager
+            if mongo_manager.db is not None:
+                user_count = await mongo_manager.db.users.count_documents({})
+                if user_count == 0:
+                    logger.info("No users found in database. Seeding initial demo accounts...")
+                    from seed_demo_data import seed
+                    await seed()
+        except Exception as seed_err:
+            logger.debug("Demo data auto-seed check: %s", seed_err)
 
     # Initialise in-process ML client
     await init_ml_client(app)
@@ -151,6 +165,7 @@ app.include_router(ml_abstention_router, prefix=ML_PREFIX)
 app.include_router(ml_calibration_router, prefix=ML_PREFIX)
 app.include_router(ml_certification_router, prefix=ML_PREFIX)
 app.include_router(ml_explainability_router, prefix=ML_PREFIX)
+app.include_router(ml_evaluation_router, prefix=ML_PREFIX)
 
 # ---------------------------------------------------------------------------
 # Health checks
