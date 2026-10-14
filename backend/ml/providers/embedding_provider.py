@@ -5,6 +5,7 @@ Module 2: Skill Intelligence & NOS Mapping
 
 from __future__ import annotations
 
+import hashlib
 import math
 import re
 from abc import ABC, abstractmethod
@@ -61,17 +62,44 @@ class DemoEmbeddingProvider(EmbeddingProvider):
     """
 
     _VOCAB_SEED = [
-        # Electrical domain vocabulary used to seed the TF-IDF space
-        "wiring", "switch", "fan", "installation", "electrical", "circuit",
-        "fault", "diagnosis", "testing", "multimeter", "tester", "voltage",
-        "current", "resistance", "earth", "earthing", "conduit", "cable",
-        "mcb", "db", "distribution", "board", "isolation", "lockout",
-        "safety", "ppe", "regulation", "inspection", "measurement",
-        "domestic", "house", "socket", "outlet", "light", "fixture",
-        "relay", "capacitor", "insulation", "continuity", "bonding",
+        # Cross-trade / General vocabulary
+        "safety", "ppe", "regulation", "inspection", "measurement", "testing",
         "plan", "prepare", "drawing", "diagram", "permit", "procedure",
         "install", "connect", "terminate", "route", "protect", "verify",
         "record", "report", "label", "identify", "select", "operate",
+        "repair", "maintenance", "troubleshoot", "fault", "diagnosis",
+        "domestic", "commercial", "industrial", "quality", "hazard",
+
+        # Electrical trade vocabulary
+        "wiring", "switch", "fan", "electrical", "circuit", "multimeter",
+        "tester", "voltage", "current", "resistance", "earth", "earthing",
+        "conduit", "cable", "mcb", "db", "distribution", "board", "isolation",
+        "lockout", "socket", "outlet", "light", "fixture", "relay",
+        "capacitor", "insulation", "continuity", "bonding", "power",
+
+        # Plumbing trade vocabulary
+        "pipe", "pipes", "pipework", "piping", "plumbing", "water", "supply",
+        "drainage", "drain", "sewer", "sewage", "sanitation", "sanitary",
+        "toilet", "wc", "commode", "cistern", "flush", "wash", "basin",
+        "sink", "shower", "bath", "geyser", "tank", "leak", "leaking",
+        "leakage", "seepage", "blockage", "clogged", "trap", "valve",
+        "tap", "faucet", "fitting", "joint", "copper", "cpvc", "pvc",
+        "upvc", "soldering", "compression",
+
+        # Welding trade vocabulary
+        "welding", "welder", "weld", "welds", "arc", "electrode", "rod",
+        "mig", "mag", "tig", "smaw", "gmaw", "mma", "stick", "bead",
+        "joint", "bevel", "bevelling", "groove", "butt", "fillet",
+        "fusion", "shielding", "gas", "argon", "co2", "defect", "porosity",
+        "undercut", "crack", "spatter", "slag", "helmet", "mask", "torch",
+        "cutting", "grinding", "amperage", "polarity",
+
+        # Masonry trade vocabulary
+        "brick", "bricks", "bricklaying", "block", "blocks", "blockwork",
+        "mortar", "cement", "sand", "plaster", "plastering", "render",
+        "rendering", "wall", "course", "bond", "plumb", "level", "trowel",
+        "scaffold", "scaffolding", "concrete", "rcc", "shuttering", "tile",
+        "tiles", "tiling", "masonry", "mason", "mix", "mixing",
     ]
 
     def __init__(self, dim: int = 64) -> None:
@@ -112,10 +140,10 @@ class DemoEmbeddingProvider(EmbeddingProvider):
                 idx = self._vocab[term] % self._dim
                 vec[idx] += count / total
 
-        # Simple hashing for OOV terms
+        # Deterministic hashing for OOV terms (independent of process hash seed)
         for term in all_terms:
             if term not in self._vocab:
-                h = hash(term) % self._dim
+                h = int(hashlib.md5(term.encode("utf-8")).hexdigest(), 16) % self._dim
                 vec[h] += 0.1 / total
 
         # L2 normalise

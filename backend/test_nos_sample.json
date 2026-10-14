@@ -1,0 +1,18 @@
+[
+  {
+    "id": "SAMPLE_NOS_001",
+    "code": "SAMPLE_NOS_001",
+    "title": "Sample NOS for Testing",
+    "description": "This is a synthetic NOS record created for testing the ingestion pipeline. It should not be confused with official NOS data.",
+    "mandatory": false,
+    "weight": 0.5,
+    "trade": "electrician",
+    "source_type": "USER_PROVIDED_UNVERIFIED",
+    "performance_criteria": [
+      "Demonstrate understanding of test NOS structure",
+      "Validate ingestion pipeline functionality",
+      "Verify synthetic data handling"
+    ],
+    "keywords": ["sample", "test", "synthetic", "demo", "validation"]
+  }
+]

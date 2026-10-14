@@ -42,7 +42,7 @@ from app.main import app
 @pytest_asyncio.fixture
 async def db_session() -> AsyncGenerator[AsyncIOMotorDatabase, None]:
     """Provide a fresh MongoDB database connection per test function."""
-    client = AsyncIOMotorClient("mongodb://localhost:27017")
+    client = AsyncIOMotorClient("mongodb://localhost:27017", uuidRepresentation="standard")
     db = client["kaushaltwin_test"]
     mongo_manager.client = client
     mongo_manager.db = db

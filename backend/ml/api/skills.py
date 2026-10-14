@@ -42,6 +42,7 @@ def extract_skills_endpoint(request: SkillExtractionRequest) -> SkillExtractionR
     - Works in DEMO MODE with no API keys.
     - Confidence values are deterministic (not random).
     - Supports Hindi, English, and Hinglish input.
+    - Supports multiple trades: electrician, plumber, welder, mason, general.
     - Provider selection is centralized in configuration.
     """
     try:
@@ -68,23 +69,30 @@ def extract_skills_endpoint(request: SkillExtractionRequest) -> SkillExtractionR
 )
 def map_nos_endpoint(request: NOSMappingRequest) -> NOSMappingResponse:
     """
-    Map extracted skills to candidate NOS elements using hybrid scoring.
+    Map extracted skills to candidate NOS elements using multi-signal hybrid scoring.
 
     Returns CANDIDATE MAPPINGS ONLY — never auto-certified.
     Human assessor confirmation is required before use in assessment.
+
     - Provider selection is centralized in configuration.
+    - Set min_similarity_threshold > 0 to suppress weak matches and trigger abstention.
+    - ambiguity_margin controls when top candidates are flagged as ambiguous.
     """
     try:
         skills_raw = [s.model_dump() for s in request.skills]
         mappings = map_skills_to_nos(
             skills=skills_raw,
             top_k=request.top_k,
+            min_similarity_threshold=request.min_similarity_threshold,
+            ambiguity_margin=request.ambiguity_margin,
         )
         parsed = []
         for m in mappings:
             parsed.append(SkillNOSMapping(
                 skill=ExtractedSkill(**m["skill"]),
                 candidates=[NOSCandidate(**c) for c in m["candidates"]],
+                abstained=m.get("abstained", False),
+                abstention_reason=m.get("abstention_reason"),
             ))
         return NOSMappingResponse(mappings=parsed)
     except Exception as exc:

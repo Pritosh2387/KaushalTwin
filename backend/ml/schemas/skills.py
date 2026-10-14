@@ -3,7 +3,7 @@ KaushalTwin ML Service — Pydantic Schemas: Skills & NOS Mapping (Module 2)
 """
 
 from __future__ import annotations
-from typing import Optional, Literal
+from typing import Optional, Literal, Dict, Any, List
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field, field_validator
 class SkillExtractionRequest(BaseModel):
     text: str = Field(..., min_length=1, description="Worker transcript or description")
     language: str = Field("en", description="BCP-47 language code")
-    trade: str = Field("electrician", description="Trade/occupation context")
+    trade: str = Field("general", description="Trade/occupation context (e.g. electrician, plumber, welder, general)")
     provider: Literal["demo", "llm"] = Field("demo", description="Skill extraction provider")
 
     @field_validator("text")
@@ -30,6 +30,19 @@ class ExtractedSkill(BaseModel):
     normalized_name: str
     evidence_text: str
     confidence: float = Field(..., ge=0.0, le=1.0)
+    # Priority 5 additions — all optional for backward compatibility
+    trade_context: Optional[str] = Field(
+        None,
+        description="Trade domain this skill was extracted from (e.g. electrician, plumber, welder, general)"
+    )
+    text_span: Optional[str] = Field(
+        None,
+        description="Original text span from which the skill was extracted"
+    )
+    extraction_method: Optional[str] = Field(
+        None,
+        description="Method used for extraction (e.g. pattern_match, synonym_expand)"
+    )
 
 
 class SkillExtractionResponse(BaseModel):
@@ -48,6 +61,20 @@ class NOSMappingRequest(BaseModel):
     skills: list[ExtractedSkill] = Field(..., min_length=1)
     top_k: int = Field(3, ge=1, le=10)
     embedding_provider: Literal["demo", "sentence_transformer"] = "demo"
+    # Priority 5 additions
+    min_similarity_threshold: float = Field(
+        0.0,
+        ge=0.0,
+        le=1.0,
+        description="Minimum combined similarity score for a candidate to be included. "
+                    "Set > 0 to suppress very weak matches."
+    )
+    ambiguity_margin: float = Field(
+        0.05,
+        ge=0.0,
+        le=0.5,
+        description="If the top two candidates are within this margin, the mapping is flagged as ambiguous."
+    )
 
 
 class NOSCandidate(BaseModel):
@@ -60,11 +87,35 @@ class NOSCandidate(BaseModel):
     methods: list[str]
     source_type: str
     mapping_status: Literal["SUGGESTED"] = "SUGGESTED"
+    # Provenance information for traceability
+    provenance: Optional[Dict[str, Any]] = None
+    # Priority 5 additions — optional for backward compatibility
+    match_reasons: Optional[List[str]] = Field(
+        None,
+        description="Human-readable explanations of why this NOS was matched"
+    )
+    ambiguity_flag: Optional[bool] = Field(
+        None,
+        description="True when this candidate is ambiguous with another nearby candidate"
+    )
+    trade_match: Optional[bool] = Field(
+        None,
+        description="True when the NOS trade matches the skill's extracted trade context"
+    )
 
 
 class SkillNOSMapping(BaseModel):
     skill: ExtractedSkill
     candidates: list[NOSCandidate]
+    # Priority 5 additions
+    abstained: bool = Field(
+        False,
+        description="True when all candidates scored below min_similarity_threshold"
+    )
+    abstention_reason: Optional[str] = Field(
+        None,
+        description="Reason for abstention when no confident match was found"
+    )
 
 
 class NOSMappingResponse(BaseModel):
@@ -90,6 +141,8 @@ class NOSSearchResult(BaseModel):
     similarity: float
     methods: list[str]
     source_type: str
+    # Provenance information for traceability
+    provenance: Optional[Dict[str, Any]] = None
 
 
 class NOSSearchResponse(BaseModel):

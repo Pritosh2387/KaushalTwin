@@ -168,5 +168,263 @@
       "Issues test completion record and certificate"
     ],
     "keywords": ["inspection", "testing", "commissioning", "insulation test", "continuity test", "certification", "completion", "energisation"]
+  },
+
+  {
+    "id": "DEMO_NOS_P01",
+    "code": "DEMO_NOS_P01",
+    "title": "Plan and Prepare for Plumbing Work",
+    "description": "Ability to read plumbing drawings and layouts, identify required materials and fittings, and plan the sequence of work for domestic water supply and drainage systems.",
+    "mandatory": true,
+    "weight": 1.0,
+    "trade": "plumber",
+    "source_type": "DEMO",
+    "performance_criteria": [
+      "Reads and interprets plumbing drawings and isometric layouts",
+      "Identifies correct pipe sizes, fittings, and materials for the job",
+      "Plans work sequence to minimise disruption to water supply",
+      "Obtains necessary permits for plumbing work where required"
+    ],
+    "keywords": ["planning", "plumbing drawing", "pipe", "fitting", "layout", "isometric", "preparation", "permit", "material selection"]
+  },
+  {
+    "id": "DEMO_NOS_P02",
+    "code": "DEMO_NOS_P02",
+    "title": "Install Domestic Water Supply Pipework",
+    "description": "Ability to install cold and hot water supply pipework in domestic premises, including cutting, bending, joining, and connecting pipes to outlets.",
+    "mandatory": true,
+    "weight": 1.0,
+    "trade": "plumber",
+    "source_type": "DEMO",
+    "performance_criteria": [
+      "Cuts pipes to correct length without burring or distortion",
+      "Bends and forms pipework to the required shape",
+      "Joins pipes using appropriate methods (soldering, compression, push-fit, CPVC cement)",
+      "Connects pipework to taps, valves, and appliances correctly"
+    ],
+    "keywords": ["pipe", "pipework", "water supply", "plumbing", "copper pipe", "CPVC", "PVC", "GI pipe", "tap", "valve", "joint", "fitting", "soldering", "compression", "push-fit", "bending", "cutting"]
+  },
+  {
+    "id": "DEMO_NOS_P03",
+    "code": "DEMO_NOS_P03",
+    "title": "Install Drainage and Sanitation Systems",
+    "description": "Ability to install above-ground drainage, waste, and vent pipework for sinks, toilets, baths, and floor drains in domestic premises.",
+    "mandatory": true,
+    "weight": 0.9,
+    "trade": "plumber",
+    "source_type": "DEMO",
+    "performance_criteria": [
+      "Installs drainage pipes with correct falls and gradients",
+      "Connects waste fittings to sinks, baths, and basins",
+      "Installs P-traps and S-traps correctly to prevent sewer gas entry",
+      "Connects to soil stack and vent pipe correctly"
+    ],
+    "keywords": ["drainage", "waste pipe", "sanitation", "toilet", "sink", "trap", "P-trap", "S-trap", "floor drain", "vent pipe", "soil pipe", "sewage", "gradient", "fall"]
+  },
+  {
+    "id": "DEMO_NOS_P04",
+    "code": "DEMO_NOS_P04",
+    "title": "Install Sanitary Fixtures and Fittings",
+    "description": "Ability to install WC pans, cisterns, wash basins, baths, showers, and associated fittings in domestic premises.",
+    "mandatory": true,
+    "weight": 0.9,
+    "trade": "plumber",
+    "source_type": "DEMO",
+    "performance_criteria": [
+      "Installs WC pan and cistern correctly with proper sealing",
+      "Connects wash basin to supply and waste correctly",
+      "Installs shower unit and associated fittings",
+      "Tests all fixtures for leaks after installation"
+    ],
+    "keywords": ["toilet", "WC", "cistern", "wash basin", "basin", "shower", "bath", "sanitary", "fixture", "fittings", "tap", "flush", "geyser", "overhead tank"]
+  },
+  {
+    "id": "DEMO_NOS_P05",
+    "code": "DEMO_NOS_P05",
+    "title": "Locate and Repair Plumbing Faults and Leaks",
+    "description": "Ability to identify, locate, and repair faults in plumbing systems including pipe leaks, blockages, faulty taps, and malfunctioning cisterns.",
+    "mandatory": true,
+    "weight": 0.9,
+    "trade": "plumber",
+    "source_type": "DEMO",
+    "performance_criteria": [
+      "Identifies source of leaks through systematic inspection",
+      "Clears blockages from waste and drainage pipes",
+      "Replaces or repairs faulty tap washers and valves",
+      "Repairs or replaces damaged pipe sections"
+    ],
+    "keywords": ["leak", "repair", "blockage", "fault", "troubleshooting", "pipe repair", "tap washer", "valve", "blocked drain", "water leak", "seepage", "burst pipe"]
+  },
+  {
+    "id": "DEMO_NOS_P06",
+    "code": "DEMO_NOS_P06",
+    "title": "Health, Safety, and Plumbing Regulations Compliance",
+    "description": "Ability to work safely and in compliance with plumbing regulations, preventing water contamination and ensuring safe working practices.",
+    "mandatory": true,
+    "weight": 1.0,
+    "trade": "plumber",
+    "source_type": "DEMO",
+    "performance_criteria": [
+      "Uses correct PPE for plumbing work",
+      "Prevents cross-connection between potable and non-potable water",
+      "Works in compliance with NBC and CPHEEO guidelines",
+      "Identifies and manages hazards in confined spaces and trenches"
+    ],
+    "keywords": ["safety", "PPE", "potable water", "contamination", "NBC", "CPHEEO", "regulation", "compliance", "hazard", "sanitation"]
+  },
+
+  {
+    "id": "DEMO_NOS_W01",
+    "code": "DEMO_NOS_W01",
+    "title": "Plan and Prepare for Welding Operations",
+    "description": "Ability to read welding drawings and symbols, identify materials and consumables, set up welding equipment, and prepare workpieces for welding.",
+    "mandatory": true,
+    "weight": 1.0,
+    "trade": "welder",
+    "source_type": "DEMO",
+    "performance_criteria": [
+      "Reads and interprets welding drawings and weld symbols",
+      "Identifies correct electrodes, filler wire, and shielding gas for the material",
+      "Sets up welding equipment to correct parameters",
+      "Prepares joint faces by cleaning, grinding, and bevelling as required"
+    ],
+    "keywords": ["welding drawing", "weld symbol", "electrode", "filler wire", "shielding gas", "joint preparation", "setup", "parameter", "bevel", "grinding", "cleaning"]
+  },
+  {
+    "id": "DEMO_NOS_W02",
+    "code": "DEMO_NOS_W02",
+    "title": "Perform Manual Metal Arc (MMA/SMAW) Welding",
+    "description": "Ability to produce sound welds in various positions using Manual Metal Arc welding on mild steel and low-alloy steel.",
+    "mandatory": true,
+    "weight": 1.0,
+    "trade": "welder",
+    "source_type": "DEMO",
+    "performance_criteria": [
+      "Selects correct electrode type and diameter for the material and thickness",
+      "Sets correct current and polarity for the electrode",
+      "Produces a sound weld with consistent bead width and profile",
+      "Achieves full penetration on butt joints as required"
+    ],
+    "keywords": ["MMA", "SMAW", "arc welding", "stick welding", "electrode", "bead", "butt joint", "fillet", "penetration", "weld pool", "mild steel", "welding rod", "amperage", "polarity"]
+  },
+  {
+    "id": "DEMO_NOS_W03",
+    "code": "DEMO_NOS_W03",
+    "title": "Perform Gas Metal Arc (MIG/MAG) Welding",
+    "description": "Ability to produce sound welds using Gas Metal Arc welding (MIG/MAG) on mild steel, stainless steel, and aluminium.",
+    "mandatory": false,
+    "weight": 0.8,
+    "trade": "welder",
+    "source_type": "DEMO",
+    "performance_criteria": [
+      "Sets up MIG/MAG welding equipment with correct wire and gas",
+      "Adjusts voltage, wire feed speed, and gas flow for the material",
+      "Produces sound fillet and butt welds with good fusion",
+      "Identifies and corrects common MIG welding defects"
+    ],
+    "keywords": ["MIG", "MAG", "GMAW", "wire feed", "shielding gas", "argon", "CO2", "welding wire", "fillet weld", "butt weld", "voltage", "wire speed", "aluminium", "stainless steel"]
+  },
+  {
+    "id": "DEMO_NOS_W04",
+    "code": "DEMO_NOS_W04",
+    "title": "Inspect Welds and Identify Welding Defects",
+    "description": "Ability to visually inspect completed welds, identify common welding defects, and determine acceptability against applicable standards.",
+    "mandatory": true,
+    "weight": 0.9,
+    "trade": "welder",
+    "source_type": "DEMO",
+    "performance_criteria": [
+      "Carries out systematic visual inspection of completed welds",
+      "Identifies defects including porosity, undercut, overlap, and cracking",
+      "Assesses welds against acceptance criteria in applicable standards",
+      "Records inspection findings and non-conformances"
+    ],
+    "keywords": ["weld inspection", "visual inspection", "porosity", "undercut", "crack", "defect", "weld quality", "acceptance criteria", "IS code", "non-destructive testing", "NDT"]
+  },
+  {
+    "id": "DEMO_NOS_W05",
+    "code": "DEMO_NOS_W05",
+    "title": "Health, Safety, and Welding Regulations Compliance",
+    "description": "Ability to work safely in welding environments, managing fumes, radiation, fire, and electrical hazards.",
+    "mandatory": true,
+    "weight": 1.0,
+    "trade": "welder",
+    "source_type": "DEMO",
+    "performance_criteria": [
+      "Uses correct PPE including welding helmet, gloves, and protective clothing",
+      "Manages ventilation to control welding fumes and gases",
+      "Prevents fire hazards from sparks and spatter",
+      "Prevents electric shock hazards from welding equipment"
+    ],
+    "keywords": ["safety", "PPE", "welding helmet", "fume", "radiation", "UV", "fire hazard", "electric shock", "ventilation", "gloves", "protective clothing", "spatter"]
+  },
+
+  {
+    "id": "DEMO_NOS_M01",
+    "code": "DEMO_NOS_M01",
+    "title": "Plan and Prepare for Masonry and Construction Work",
+    "description": "Ability to read construction drawings, identify materials, set out work, and plan the sequence of masonry and construction operations.",
+    "mandatory": true,
+    "weight": 1.0,
+    "trade": "mason",
+    "source_type": "DEMO",
+    "performance_criteria": [
+      "Reads and interprets construction drawings and plans",
+      "Identifies correct types and quantities of materials",
+      "Sets out building lines and levels using instruments",
+      "Plans work sequence to optimise material use and avoid disruption"
+    ],
+    "keywords": ["masonry", "construction drawing", "setting out", "building line", "level", "material", "brickwork", "blockwork", "planning"]
+  },
+  {
+    "id": "DEMO_NOS_M02",
+    "code": "DEMO_NOS_M02",
+    "title": "Lay Bricks, Blocks, and Masonry Units",
+    "description": "Ability to construct brick and block walls, piers, and columns to correct line, level, plumb, and bond using appropriate mortars.",
+    "mandatory": true,
+    "weight": 1.0,
+    "trade": "mason",
+    "source_type": "DEMO",
+    "performance_criteria": [
+      "Mixes mortar to correct proportions and consistency",
+      "Lays bricks to correct bond pattern and alignment",
+      "Checks work for plumb, level, and line throughout construction",
+      "Forms openings, reveals, and returns correctly"
+    ],
+    "keywords": ["brick", "block", "mortar", "bond", "plumb", "level", "wall", "course", "trowel", "masonry", "bricklaying", "construction", "cement", "sand"]
+  },
+  {
+    "id": "DEMO_NOS_M03",
+    "code": "DEMO_NOS_M03",
+    "title": "Apply Plastering and Rendering",
+    "description": "Ability to apply scratch coats, floating coats, and finishing coats of plaster and render to walls, ceilings, and soffits.",
+    "mandatory": false,
+    "weight": 0.8,
+    "trade": "mason",
+    "source_type": "DEMO",
+    "performance_criteria": [
+      "Prepares background surface by cleaning and applying bonding agent",
+      "Applies scratch coat to correct thickness and keying",
+      "Applies float coat to achieve flat, plumb, and level surface",
+      "Applies finish coat to achieve specified texture"
+    ],
+    "keywords": ["plaster", "plastering", "render", "scratch coat", "float coat", "finish", "wall finish", "cement plaster", "lime plaster", "trowel", "hawk"]
+  },
+  {
+    "id": "DEMO_NOS_M04",
+    "code": "DEMO_NOS_M04",
+    "title": "Health, Safety, and Construction Site Compliance",
+    "description": "Ability to work safely on construction sites, managing hazards from manual handling, working at height, and construction materials.",
+    "mandatory": true,
+    "weight": 1.0,
+    "trade": "mason",
+    "source_type": "DEMO",
+    "performance_criteria": [
+      "Uses correct PPE for construction work including hard hat, boots, and gloves",
+      "Follows safe manual handling procedures for heavy materials",
+      "Works safely at height from scaffolding and ladders",
+      "Identifies and reports site hazards to supervisor"
+    ],
+    "keywords": ["safety", "PPE", "hard hat", "scaffold", "manual handling", "hazard", "construction site", "working at height", "site safety"]
   }
 ]
