@@ -96,6 +96,11 @@ export const assessmentsApi = {
     return data;
   },
 
+  getWorkerAssessments: async (workerId) => {
+    const { data } = await apiClient.get(`/api/v1/workers/${workerId}/assessments`);
+    return data;
+  },
+
   // Aliases for compatibility
   getAll: async (params) => assessmentsApi.getAssessments(params),
   getById: async (id) => assessmentsApi.getAssessment(id),

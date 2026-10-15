@@ -14,6 +14,7 @@ import { assessmentsApi } from '../../api/assessments.api';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { formatDate } from '../../lib/date';
 
 export function AuditPage() {
   const [search, setSearch] = useState('');
@@ -173,7 +174,7 @@ export function AuditPage() {
                   <div className="text-right sm:flex-shrink-0 text-[10px] text-zinc-500">
                     <div className="flex items-center gap-1 sm:justify-end text-zinc-400">
                       <Clock className="w-3 h-3" />
-                      <span>{new Date(evt.timestamp).toLocaleDateString()}</span>
+                      <span>{formatDate(evt.timestamp)}</span>
                     </div>
                     <div className="mt-0.5">{new Date(evt.timestamp).toLocaleTimeString()}</div>
                   </div>

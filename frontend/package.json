@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "vitest run --pool=vmThreads",
+    "test": "vitest run --pool=threads",
     "lint": "oxlint",
     "preview": "vite preview"
   },

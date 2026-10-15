@@ -39,12 +39,15 @@ describe('UI Design System Components', () => {
     expect(c3.textContent).toContain('REJECTED');
   });
 
-  it('renders RoleBadge correctly for ASSESSOR and ADMIN', () => {
+  it('renders RoleBadge correctly for ASSESSOR, ADMIN, and WORKER', () => {
     render(<RoleBadge role="ASSESSOR" />);
     expect(screen.getByText('Assessor')).toBeDefined();
 
     render(<RoleBadge role="ADMIN" />);
     expect(screen.getByText('Admin')).toBeDefined();
+
+    render(<RoleBadge role="WORKER" />);
+    expect(screen.getByText('Worker')).toBeDefined();
   });
 
   it('renders Alert component with error variant and dismiss button', () => {

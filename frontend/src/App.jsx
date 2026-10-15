@@ -10,6 +10,10 @@ import { LandingPage } from './pages/landing/LandingPage';
 import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import { DashboardPage } from './pages/dashboard/DashboardPage';
+import { WorkerDashboard } from './pages/dashboard/WorkerDashboard';
+import { RoleBasedDashboard } from './pages/dashboard/RoleBasedDashboard';
+import { WorkerProfilePage } from './pages/workers/WorkerProfilePage';
+import { WorkerExperiencePage } from './pages/workers/WorkerExperiencePage';
 import { WorkersPage } from './pages/workers/WorkersPage';
 import { WorkerDetailPage } from './pages/workers/WorkerDetailPage';
 import { AssessmentsPage } from './pages/assessments/AssessmentsPage';
@@ -53,17 +57,71 @@ export default function App() {
                 </ProtectedRoute>
               }
             >
-              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/dashboard" element={<RoleBasedDashboard />} />
+              <Route path="/worker-dashboard" element={<WorkerDashboard />} />
               <Route path="/overview" element={<Navigate to="/dashboard" replace />} />
               <Route path="/app" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/workers" element={<WorkersPage />} />
-              <Route path="/workers/:id" element={<WorkerDetailPage />} />
+              
+              {/* Worker specific routes */}
+              <Route
+                path="/workers/profile"
+                element={
+                  <ProtectedRoute allowedRoles={['WORKER']}>
+                    <WorkerProfilePage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/workers/experience"
+                element={
+                  <ProtectedRoute allowedRoles={['WORKER']}>
+                    <WorkerExperiencePage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Assessor / Admin candidate management routes */}
+              <Route
+                path="/workers"
+                element={
+                  <ProtectedRoute allowedRoles={['ASSESSOR', 'ADMIN']}>
+                    <WorkersPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/workers/:id"
+                element={
+                  <ProtectedRoute allowedRoles={['ASSESSOR', 'ADMIN']}>
+                    <WorkerDetailPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Assessment routes */}
               <Route path="/assessments" element={<AssessmentsPage />} />
-              <Route path="/assessments/:id" element={<AssessmentWorkspacePage />} />
+              <Route
+                path="/assessments/:id"
+                element={
+                  <ProtectedRoute allowedRoles={['ASSESSOR', 'ADMIN']}>
+                    <AssessmentWorkspacePage />
+                  </ProtectedRoute>
+                }
+              />
+
               <Route path="/evidence" element={<EvidencePage />} />
               <Route path="/competencies" element={<CompetenciesPage />} />
               <Route path="/reports" element={<ReportsPage />} />
-              <Route path="/audit" element={<AuditPage />} />
+              
+              {/* Assessor / Admin audit route */}
+              <Route
+                path="/audit"
+                element={
+                  <ProtectedRoute allowedRoles={['ASSESSOR', 'ADMIN']}>
+                    <AuditPage />
+                  </ProtectedRoute>
+                }
+              />
               <Route path="/settings" element={<SettingsPage />} />
             </Route>
 

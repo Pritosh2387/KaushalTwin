@@ -38,6 +38,11 @@ export const workersApi = {
     return data;
   },
 
+  getMyProfile: async () => {
+    const { data } = await apiClient.get('/api/v1/workers/me');
+    return data;
+  },
+
   // Aliases for compatibility
   getAll: async (params) => workersApi.getWorkers(params),
   getById: async (id) => workersApi.getWorker(id),
@@ -46,6 +51,7 @@ export const workersApi = {
   getAssessments: async (id) => workersApi.getWorkerAssessments(id),
   getEvidence: async (id) => workersApi.getWorkerEvidence(id),
   getCompetencyProfile: async (id) => workersApi.getWorkerCompetencyProfile(id),
+  getMe: async () => workersApi.getMyProfile(),
 };
 
 export default workersApi;

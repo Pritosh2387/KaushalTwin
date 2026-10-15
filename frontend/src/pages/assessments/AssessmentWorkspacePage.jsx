@@ -28,8 +28,8 @@ import { Skeleton } from '../../components/ui/Skeleton';
 import { Alert } from '../../components/ui/Alert';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
-import { Select } from '../../components/ui/Select';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { formatDate } from '../../lib/date';
 
 export function AssessmentWorkspacePage() {
   const { id } = useParams();
@@ -258,7 +258,7 @@ export function AssessmentWorkspacePage() {
             <span>•</span>
             <span>Experience: <strong className="text-white">{worker?.years_of_experience || 0} Years</strong></span>
             <span>•</span>
-            <span>Created: {new Date(assessment.created_at).toLocaleDateString()}</span>
+            <span>Created: {formatDate(assessment.created_at)}</span>
           </div>
         </div>
 

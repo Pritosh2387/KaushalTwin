@@ -23,6 +23,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Ca
 import { Button } from '../../components/ui/Button';
 import { StatusBadge, RoleBadge } from '../../components/ui/Badge';
 import { Skeleton } from '../../components/ui/Skeleton';
+import { formatDate } from '../../lib/date';
 
 export function DashboardPage() {
   const { user, isAssessor, isAdmin, isWorker } = useAuth();
@@ -267,7 +268,7 @@ export function DashboardPage() {
                         <div className="text-[11px] font-mono text-zinc-500 flex items-center gap-2 mt-0.5">
                           <span>Candidate: {a.worker_id.slice(0, 8)}</span>
                           <span>•</span>
-                          <span>{new Date(a.created_at).toLocaleDateString()}</span>
+                          <span>{formatDate(a.created_at)}</span>
                         </div>
                       </div>
                     </div>

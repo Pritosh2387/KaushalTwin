@@ -13,17 +13,37 @@ import { Button } from '../../components/ui/Button';
 import { StatusBadge } from '../../components/ui/Badge';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { useAuth } from '../../context/AuthContext';
+import { workersApi } from '../../api/workers.api';
+import { formatDateTime, formatDate } from '../../lib/date';
 
 export function ReportsPage() {
+  const { user, isWorker } = useAuth();
   const [selectedAssessmentId, setSelectedAssessmentId] = useState('');
 
-  // Fetch all assessments for the selector
-  const { data: assessmentsData } = useQuery({
-    queryKey: ['assessments', { limit: 100 }],
-    queryFn: () => assessmentsApi.getAll({ limit: 100 }),
+  // Fetch my profile if worker
+  const { data: myProfile } = useQuery({
+    queryKey: ['my-profile'],
+    queryFn: () => workersApi.getMyProfile(),
+    enabled: isWorker,
   });
 
-  const assessments = assessmentsData?.items || [];
+  const workerTargetId = myProfile?.id || user?.id;
+
+  // Fetch assessments: if worker, only fetch their assessments; if assessor, fetch all
+  const { data: assessmentsData, isLoading: assessmentsLoading } = useQuery({
+    queryKey: ['assessments-for-reports', { isWorker, workerTargetId }],
+    queryFn: () => {
+      if (isWorker) {
+        return assessmentsApi.getWorkerAssessments(workerTargetId);
+      }
+      return assessmentsApi.getAll({ limit: 100 });
+    },
+    enabled: isWorker ? !!workerTargetId : true,
+  });
+
+  const rawAssessments = Array.isArray(assessmentsData) ? assessmentsData : (assessmentsData?.items || []);
+  const assessments = rawAssessments;
   const activeId = selectedAssessmentId || (assessments[0]?.id || '');
 
   const {
@@ -59,31 +79,32 @@ export function ReportsPage() {
           <div className="space-y-2">
             <div className="flex items-center gap-2 font-mono text-xs text-zinc-400 uppercase tracking-widest">
               <span className="w-1.5 h-1.5 bg-white" />
-              <span>Official Certification Dossiers</span>
+              <span>{isWorker ? 'Official RPL Recognition Dossier' : 'Official Certification Dossiers'}</span>
             </div>
             <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight uppercase">
-              Reports &amp; Dossiers
+              {isWorker ? 'My Assessment Dossier' : 'Reports & Dossiers'}
             </h1>
             <p className="text-xs sm:text-sm text-zinc-400 font-light font-sans">
-              Official audit dossiers conforming to NCVET RPL certification guidelines
+              {isWorker
+                ? 'Official RPL competency evaluation outcomes and assessor verification records conforming to NCVET guidelines.'
+                : 'Official audit dossiers conforming to NCVET RPL certification guidelines'}
             </p>
           </div>
 
           <div className="flex items-center gap-3">
-            <select
-              value={activeId}
-              onChange={(e) => setSelectedAssessmentId(e.target.value)}
-              className="py-2 px-3 text-xs font-mono bg-[#080808] border border-white/20 text-white focus:border-white outline-none"
-            >
-              {assessments.length === 0 && (
-                <option value="">No assessments available</option>
-              )}
-              {assessments.map((a) => (
-                <option key={a.id} value={a.id} className="bg-[#0a0a0a] text-white">
-                  {a.trade} (#{a.id.slice(0, 8)})
-                </option>
-              ))}
-            </select>
+            {assessments.length > 1 && (
+              <select
+                value={activeId}
+                onChange={(e) => setSelectedAssessmentId(e.target.value)}
+                className="py-2 px-3 text-xs font-mono bg-[#080808] border border-white/20 text-white focus:border-white outline-none"
+              >
+                {assessments.map((a) => (
+                  <option key={a.id} value={a.id} className="bg-[#0a0a0a] text-white">
+                    {a.trade} (#{a.id.slice(0, 8)})
+                  </option>
+                ))}
+              </select>
+            )}
 
             <Button
               variant="primary"
@@ -99,15 +120,32 @@ export function ReportsPage() {
         </div>
       </div>
 
+      {/* Advisory Banner for Workers */}
+      {isWorker && (
+        <div className="p-4 bg-teal-950/20 border border-teal-500/30 flex items-start gap-3">
+          <ShieldCheck className="w-5 h-5 text-teal-400 flex-shrink-0 mt-0.5" />
+          <div className="text-xs space-y-1 font-sans">
+            <div className="font-mono text-teal-300 font-semibold uppercase tracking-wider text-[11px]">
+              Assessor Governance Notice
+            </div>
+            <p className="text-zinc-300 leading-relaxed">
+              AI recommendations contained in this dossier are strictly advisory inputs synthesized to assist assessor judgment. In accordance with NCVET RPL certification standards, <strong>the final certification outcome is determined exclusively by an authorized human assessor</strong>.
+            </p>
+          </div>
+        </div>
+      )}
+
       {reportLoading ? (
         <Skeleton className="h-96 w-full" />
       ) : reportError || !report ? (
         <div className="bg-[#050505] border border-white/10 p-8">
           <EmptyState
             icon={FileText}
-            title="Dossier Not Generated"
-            description="Run AI Analysis and record an assessor decision inside the assessment workspace to synthesize this report."
-            actionLabel="View Assessments"
+            title={isWorker ? "No Dossier Synthesized Yet" : "Dossier Not Generated"}
+            description={isWorker
+              ? "Your official RPL dossier will be available here once an assessor finishes evaluating your portfolio. You can continue submitting supporting evidence in the meantime."
+              : "Run AI Analysis and record an assessor decision inside the assessment workspace to synthesize this report."}
+            actionLabel={isWorker ? "View My Evidence" : "View Assessments"}
             onAction={() => setSelectedAssessmentId(assessments[0]?.id || '')}
           />
         </div>
@@ -130,7 +168,7 @@ export function ReportsPage() {
             </div>
 
             <div className="text-right text-xs text-zinc-400">
-              <div>GENERATED: {new Date(report.generated_at).toLocaleString()}</div>
+              <div>GENERATED: {formatDateTime(report.generated_at)}</div>
               <div>AUTHENTICATED BY: {latestDecision?.assessor_id || 'CERTIFIED_ASSESSOR'}</div>
             </div>
           </div>

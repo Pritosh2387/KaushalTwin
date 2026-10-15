@@ -50,6 +50,9 @@ class MongoBaseModel(BaseModel):
             return None
         doc_copy = dict(doc)
         doc_copy.pop("_id", None)
+        for k, v in list(doc_copy.items()):
+            if isinstance(v, datetime) and v.tzinfo is None:
+                doc_copy[k] = v.replace(tzinfo=timezone.utc)
         return cls.model_validate(doc_copy)
 
 
@@ -74,6 +77,13 @@ class WorkerProfile(MongoBaseModel):
     experience_summary: Optional[str] = None
     education_summary: Optional[str] = None
     assessment_status: str = "NOT_STARTED"
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    education_level: Optional[str] = None
+    declared_skills: list[str] = Field(default_factory=list)
+    languages: list[str] = Field(default_factory=list)
+    previous_employment: Optional[str] = None
+    informal_work_description: Optional[str] = None
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
@@ -82,7 +92,7 @@ class EvidenceRecord(MongoBaseModel):
     id: uuid.UUID = Field(default_factory=uuid.uuid4)
     worker_id: uuid.UUID
     assessment_id: Optional[uuid.UUID] = None
-    uploaded_by_id: uuid.UUID
+    uploaded_by_id: Optional[uuid.UUID] = None
     evidence_type: str = "OTHER"
     source_type: str = "SELF"
     description: str

@@ -81,7 +81,8 @@ router = APIRouter(prefix="/assessments", tags=["Assessments"])
 async def _get_assessment_or_404(
     assessment_id: uuid.UUID, db: AsyncIOMotorDatabase
 ) -> Assessment:
-    doc = await db.assessments.find_one({"id": str(assessment_id)})
+    id_q = {"$in": [str(assessment_id), assessment_id]}
+    doc = await db.assessments.find_one({"id": id_q})
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found")
     return Assessment.from_mongo(doc)
@@ -91,14 +92,14 @@ def _assert_assessor_owns(assessment: Assessment, current_user: User) -> None:
     """Only the assigned assessor or admin can modify an assessment."""
     if current_user.role == UserRole.ADMIN:
         return
-    if assessment.assessor_id != current_user.id:
+    if str(assessment.assessor_id) != str(current_user.id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
 
 def _assert_can_view(assessment: Assessment, current_user: User, worker: Optional[WorkerProfile] = None) -> None:
     if current_user.role in (UserRole.ADMIN, UserRole.ASSESSOR):
         return
-    if worker and worker.user_id == current_user.id:
+    if worker and str(worker.user_id) == str(current_user.id):
         return
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
@@ -189,7 +190,8 @@ async def get_assessment(
     current_user: User = Depends(get_current_active_user),
 ) -> AssessmentResponse:
     assessment = await _get_assessment_or_404(assessment_id, db)
-    worker_doc = await db.workers.find_one({"id": str(assessment.worker_id)})
+    w_q = {"$in": [str(assessment.worker_id), assessment.worker_id]}
+    worker_doc = await db.workers.find_one({"id": w_q})
     worker = WorkerProfile.from_mongo(worker_doc) if worker_doc else None
     _assert_can_view(assessment, current_user, worker)
     return AssessmentResponse.model_validate(assessment)
@@ -875,12 +877,13 @@ async def get_report(
     current_user: User = Depends(get_current_active_user),
 ) -> AssessmentReport:
     assessment = await _get_assessment_or_404(assessment_id, db)
-    worker_doc = await db.workers.find_one({"id": str(assessment.worker_id)})
+    w_q = {"$in": [str(assessment.worker_id), assessment.worker_id]}
+    worker_doc = await db.workers.find_one({"id": w_q})
     worker = WorkerProfile.from_mongo(worker_doc) if worker_doc else None
     _assert_can_view(assessment, current_user, worker)
 
     # Evidence
-    ev_cursor = db.evidence.find({"worker_id": str(assessment.worker_id)})
+    ev_cursor = db.evidence.find({"worker_id": w_q})
     evidence_records = []
     async for e in ev_cursor:
         evidence_records.append(EvidenceRecord.from_mongo(e))

@@ -26,6 +26,13 @@ class WorkerUpdateRequest(BaseModel):
     years_of_experience: Optional[int] = Field(None, ge=0, le=70)
     experience_summary: Optional[str] = None
     education_summary: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    education_level: Optional[str] = None
+    declared_skills: Optional[list[str]] = None
+    languages: Optional[list[str]] = None
+    previous_employment: Optional[str] = None
+    informal_work_description: Optional[str] = None
 
 
 class WorkerResponse(BaseModel):
@@ -33,11 +40,18 @@ class WorkerResponse(BaseModel):
     full_name: str
     trade: str
     years_of_experience: int
-    experience_summary: Optional[str]
-    education_summary: Optional[str]
+    experience_summary: Optional[str] = None
+    education_summary: Optional[str] = None
     assessment_status: str
-    user_id: Optional[uuid.UUID]
-    registered_by_id: Optional[uuid.UUID]
+    user_id: Optional[uuid.UUID] = None
+    registered_by_id: Optional[uuid.UUID] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    education_level: Optional[str] = None
+    declared_skills: list[str] = Field(default_factory=list)
+    languages: list[str] = Field(default_factory=list)
+    previous_employment: Optional[str] = None
+    informal_work_description: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

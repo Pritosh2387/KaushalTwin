@@ -36,18 +36,18 @@ class EvidenceVerifyRequest(BaseModel):
 class EvidenceResponse(BaseModel):
     id: uuid.UUID
     worker_id: uuid.UUID
-    assessment_id: Optional[uuid.UUID]
-    uploaded_by_id: uuid.UUID
+    assessment_id: Optional[uuid.UUID] = None
+    uploaded_by_id: Optional[uuid.UUID] = None
     evidence_type: str
     source_type: str
     description: str
-    nos_id: Optional[str]
-    file_name: Optional[str]
-    file_size_bytes: Optional[int]
-    mime_type: Optional[str]
-    content_hash: Optional[str]
+    nos_id: Optional[str] = None
+    file_name: Optional[str] = None
+    file_size_bytes: Optional[int] = None
+    mime_type: Optional[str] = None
+    content_hash: Optional[str] = None
     verification_status: str
-    verification_notes: Optional[str]
+    verification_notes: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

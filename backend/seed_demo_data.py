@@ -68,6 +68,8 @@ async def seed():
 
     assessor_doc = await db.users.find_one({"email": "assessor@kaushaltwin.gov.in"})
     assessor_id = assessor_doc["id"]
+    worker_user = await db.users.find_one({"email": "worker@kaushaltwin.gov.in"})
+    worker_user_id = worker_user["id"]
 
     # 2. Seed Workers
     workers_data = [
@@ -89,10 +91,10 @@ async def seed():
         },
         {
             "id": uuid.uuid4(),
-            "user_id": assessor_id,
+            "user_id": worker_user_id,
             "full_name": "Ramesh Kumar Verma",
             "phone": "+91 98111 22334",
-            "email": "ramesh.kumar@example.com",
+            "email": "worker@kaushaltwin.gov.in",
             "trade": "Electrical Installation",
             "years_of_experience": 6,
             "education_level": "12th Standard",
@@ -253,6 +255,7 @@ async def seed():
         {
             "id": uuid.uuid4(),
             "worker_id": ramesh["id"],
+            "uploaded_by_id": worker_user_id,
             "evidence_type": "EXPERIENCE_DECLARATION",
             "source_type": "DIRECT_ENTRY",
             "description": "Supervisor reference letter from Verma Electricals certifying 6 years site experience.",
@@ -268,6 +271,18 @@ async def seed():
         if not existing:
             await db.evidence.insert_one(ev)
             print(f"Created evidence item: {ev['description'][:40]}...")
+        else:
+            if "uploaded_by_id" in ev:
+                await db.evidence.update_one(
+                    {"description": ev["description"]},
+                    {"$set": {"uploaded_by_id": ev["uploaded_by_id"]}}
+                )
+
+    # Ensure worker user_id link is saved for Ramesh
+    await db.workers.update_one(
+        {"full_name": "Ramesh Kumar Verma"},
+        {"$set": {"user_id": worker_user_id}}
+    )
 
     print("Seeding complete! All demo data successfully populated in MongoDB.")
 

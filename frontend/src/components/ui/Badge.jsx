@@ -10,27 +10,27 @@ export function Badge({
   dot = false,
   ...props
 }) {
-  // Purely monochromatic luxury badge styles
+  // Refined dark technical aesthetic with subtle semantic accents
   const variants = {
-    slate: 'bg-[#0a0a0a] text-zinc-300 border-white/15',
-    navy: 'bg-[#080808] text-white border-white/20',
-    teal: 'bg-[#080808] text-zinc-200 border-white/25',
-    cyan: 'bg-[#0a0a0a] text-white border-white/30',
-    emerald: 'bg-[#09090b] text-white border-white/30 font-medium',
-    amber: 'bg-[#080808] text-zinc-300 border-white/20',
-    rose: 'bg-[#080808] text-zinc-400 border-white/20',
-    purple: 'bg-[#080808] text-zinc-300 border-white/20',
+    slate: 'bg-zinc-900/60 text-zinc-300 border-zinc-700/50',
+    navy: 'bg-blue-950/40 text-blue-300 border-blue-500/30',
+    teal: 'bg-teal-950/40 text-teal-300 border-teal-500/30',
+    cyan: 'bg-cyan-950/40 text-cyan-300 border-cyan-500/30',
+    emerald: 'bg-emerald-950/50 text-emerald-300 border-emerald-500/40 font-medium',
+    amber: 'bg-amber-950/40 text-amber-300 border-amber-500/30',
+    rose: 'bg-rose-950/40 text-rose-300 border-rose-500/30',
+    purple: 'bg-purple-950/40 text-purple-300 border-purple-500/30',
   };
 
   const dotColors = {
-    slate: 'bg-zinc-500',
-    navy: 'bg-zinc-300',
-    teal: 'bg-white',
-    cyan: 'bg-white',
-    emerald: 'bg-white',
-    amber: 'bg-zinc-400',
-    rose: 'bg-zinc-500',
-    purple: 'bg-zinc-400',
+    slate: 'bg-zinc-400',
+    navy: 'bg-blue-400',
+    teal: 'bg-teal-400',
+    cyan: 'bg-cyan-400',
+    emerald: 'bg-emerald-400',
+    amber: 'bg-amber-400',
+    rose: 'bg-rose-400',
+    purple: 'bg-purple-400',
   };
 
   const sizes = {
@@ -119,19 +119,19 @@ export function RoleBadge({ role, size = 'md', className = '' }) {
   switch (normalized) {
     case 'ADMIN':
       return (
-        <Badge variant="navy" size={size} className={className}>
+        <Badge variant="purple" size={size} className={className}>
           Admin
         </Badge>
       );
     case 'ASSESSOR':
       return (
-        <Badge variant="teal" size={size} className={className}>
+        <Badge variant="cyan" size={size} className={className}>
           Assessor
         </Badge>
       );
     case 'WORKER':
       return (
-        <Badge variant="slate" size={size} className={className}>
+        <Badge variant="emerald" size={size} className={className}>
           Worker
         </Badge>
       );

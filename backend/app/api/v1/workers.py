@@ -32,6 +32,7 @@ from app.schemas.worker import (
 )
 from app.schemas.assessment import AssessmentResponse
 from app.schemas.evidence import EvidenceResponse
+from app.db.models.mongo_models import EvidenceRecord
 from app.services import audit_service
 
 logger = logging.getLogger(__name__)
@@ -122,6 +123,61 @@ async def list_workers(
     )
 
 
+def _match_id(val: uuid.UUID | str) -> dict:
+    s_val = str(val)
+    try:
+        u_val = uuid.UUID(s_val)
+        return {"$in": [s_val, u_val]}
+    except (ValueError, TypeError):
+        return {"$eq": s_val}
+
+
+@router.get(
+    "/me",
+    response_model=WorkerResponse,
+    summary="Get current authenticated worker's profile",
+)
+async def get_my_worker_profile(
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> WorkerResponse:
+    if current_user.role != UserRole.WORKER:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only users with WORKER role have a worker profile",
+        )
+    user_q = _match_id(current_user.id)
+    doc = await db.workers.find_one({"user_id": user_q})
+    if not doc:
+        # Fallback search by email or name
+        if current_user.email:
+            doc = await db.workers.find_one({"email": current_user.email})
+        if not doc and current_user.name:
+            doc = await db.workers.find_one({"full_name": current_user.name})
+            if not doc:
+                doc = await db.workers.find_one({"full_name": {"$regex": f"^{current_user.name}", "$options": "i"}})
+        if doc:
+            await db.workers.update_one({"_id": doc["_id"]}, {"$set": {"user_id": str(current_user.id)}})
+            doc["user_id"] = str(current_user.id)
+
+    if not doc:
+        # Auto-initialize a fresh worker profile for the registered worker
+        new_worker = WorkerProfile(
+            id=uuid.uuid4(),
+            user_id=current_user.id,
+            full_name=current_user.name,
+            email=current_user.email,
+            trade="General",
+            years_of_experience=0,
+            assessment_status="NOT_STARTED",
+        )
+        await db.workers.insert_one(new_worker.to_mongo())
+        doc = new_worker.to_mongo()
+
+    worker = WorkerProfile.from_mongo(doc)
+    return WorkerResponse.model_validate(worker)
+
+
 @router.get(
     "/{worker_id}",
     response_model=WorkerResponse,
@@ -132,7 +188,8 @@ async def get_worker(
     db: AsyncIOMotorDatabase = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> WorkerResponse:
-    doc = await db.workers.find_one({"id": str(worker_id)})
+    id_q = _match_id(worker_id)
+    doc = await db.workers.find_one({"$or": [{"id": id_q}, {"user_id": id_q}]})
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Worker not found")
 
@@ -150,18 +207,22 @@ async def update_worker(
     worker_id: uuid.UUID,
     body: WorkerUpdateRequest,
     db: AsyncIOMotorDatabase = Depends(get_db),
-    current_user: User = Depends(require_assessor),
+    current_user: User = Depends(get_current_active_user),
 ) -> WorkerResponse:
-    doc = await db.workers.find_one({"id": str(worker_id)})
+    id_q = _match_id(worker_id)
+    doc = await db.workers.find_one({"$or": [{"id": id_q}, {"user_id": id_q}]})
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Worker not found")
 
     worker = WorkerProfile.from_mongo(doc)
+    _assert_worker_access(worker, current_user)
+
     update_data = body.model_dump(exclude_unset=True)
     update_data["updated_at"] = datetime.now(timezone.utc)
 
-    await db.workers.update_one({"id": str(worker_id)}, {"$set": update_data})
-    updated_doc = await db.workers.find_one({"id": str(worker_id)})
+    target_id_q = _match_id(worker.id)
+    await db.workers.update_one({"id": target_id_q}, {"$set": update_data})
+    updated_doc = await db.workers.find_one({"id": target_id_q})
     updated_worker = WorkerProfile.from_mongo(updated_doc)
 
     await audit_service.record_event(
@@ -187,14 +248,16 @@ async def get_worker_assessments(
     db: AsyncIOMotorDatabase = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> list[AssessmentResponse]:
-    doc = await db.workers.find_one({"id": str(worker_id)})
+    id_q = _match_id(worker_id)
+    doc = await db.workers.find_one({"$or": [{"id": id_q}, {"user_id": id_q}]})
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Worker not found")
 
     worker = WorkerProfile.from_mongo(doc)
     _assert_worker_access(worker, current_user)
 
-    cursor = db.assessments.find({"worker_id": str(worker_id)})
+    w_q = _match_id(worker.id)
+    cursor = db.assessments.find({"worker_id": w_q})
     items = []
     async for a_doc in cursor:
         items.append(AssessmentResponse.model_validate(a_doc))
@@ -211,17 +274,26 @@ async def get_worker_evidence(
     db: AsyncIOMotorDatabase = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> list[EvidenceResponse]:
-    doc = await db.workers.find_one({"id": str(worker_id)})
+    id_q = _match_id(worker_id)
+    doc = await db.workers.find_one({"$or": [{"id": id_q}, {"user_id": id_q}]})
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Worker not found")
 
     worker = WorkerProfile.from_mongo(doc)
     _assert_worker_access(worker, current_user)
 
-    cursor = db.evidence.find({"worker_id": str(worker_id)})
+    w_q = _match_id(worker.id)
+    or_clauses = [{"worker_id": w_q}]
+    if worker.user_id:
+        or_clauses.append({"worker_id": _match_id(worker.user_id)})
+        or_clauses.append({"uploaded_by_id": _match_id(worker.user_id)})
+    if current_user.role == UserRole.WORKER:
+        or_clauses.append({"uploaded_by_id": _match_id(current_user.id)})
+
+    cursor = db.evidence.find({"$or": or_clauses}).sort("created_at", -1)
     items = []
     async for e_doc in cursor:
-        items.append(EvidenceResponse.model_validate(e_doc))
+        items.append(EvidenceResponse.model_validate(EvidenceRecord.from_mongo(e_doc)))
     return items
 
 
@@ -235,16 +307,18 @@ async def get_worker_competency_profile(
     db: AsyncIOMotorDatabase = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> WorkerCompetencyProfileResponse:
-    doc = await db.workers.find_one({"id": str(worker_id)})
+    id_q = _match_id(worker_id)
+    doc = await db.workers.find_one({"$or": [{"id": id_q}, {"user_id": id_q}]})
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Worker not found")
 
     worker = WorkerProfile.from_mongo(doc)
     _assert_worker_access(worker, current_user)
 
+    w_q = _match_id(worker.id)
     # Find the latest successful AI run for this worker
     latest_run = await db.ai_runs.find_one(
-        {"worker_id": str(worker_id), "status": {"$in": ["SUCCESS", "COMPLETED"]}},
+        {"worker_id": w_q, "status": {"$in": ["SUCCESS", "COMPLETED"]}},
         sort=[("created_at", -1)],
     )
 
@@ -263,6 +337,16 @@ async def get_worker_competency_profile(
         nos_candidates = ml_data.get("nos_candidates", [])
         has_profile = bool(competencies)
 
+    # Fallback to candidate_competencies from assessments if no AI run yet
+    if not competencies:
+        assessment_doc = await db.assessments.find_one(
+            {"worker_id": w_q, "candidate_competencies": {"$exists": True, "$ne": []}},
+            sort=[("created_at", -1)],
+        )
+        if assessment_doc and assessment_doc.get("candidate_competencies"):
+            competencies = assessment_doc["candidate_competencies"]
+            has_profile = True
+
     status_str = (
         worker.assessment_status.value
         if hasattr(worker.assessment_status, "value")
@@ -273,7 +357,7 @@ async def get_worker_competency_profile(
         worker_id=worker.id,
         trade=worker.trade,
         assessment_status=status_str,
-        latest_ai_run_id=uuid.UUID(latest_run["id"]) if latest_run and "id" in latest_run else None,
+        latest_ai_run_id=uuid.UUID(str(latest_run["id"])) if latest_run and "id" in latest_run else None,
         competencies=competencies,
         summary=summary,
         skills_extracted=skills_extracted,

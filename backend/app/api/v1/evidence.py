@@ -50,11 +50,14 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/evidence", tags=["Evidence"])
 
 
-def _assert_evidence_access(record: EvidenceRecord, current_user: User) -> None:
+def _assert_evidence_access(record: EvidenceRecord, current_user: User, worker_user_id: Optional[uuid.UUID | str] = None) -> None:
     if current_user.role in (UserRole.ADMIN, UserRole.ASSESSOR):
         return
-    if record.uploaded_by_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    if str(record.uploaded_by_id) == str(current_user.id):
+        return
+    if worker_user_id and str(worker_user_id) == str(current_user.id):
+        return
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
 
 @router.get(
@@ -72,11 +75,22 @@ async def list_evidence(
 ) -> EvidenceListResponse:
     query = {}
     if current_user.role == UserRole.WORKER:
-        query["uploaded_by_id"] = str(current_user.id)
+        user_match = [str(current_user.id), current_user.id]
+        worker_doc = await db.workers.find_one({"user_id": {"$in": user_match}})
+        if worker_doc:
+            w_id = worker_doc["id"]
+            w_match = [str(w_id), w_id]
+            query["$or"] = [
+                {"uploaded_by_id": {"$in": user_match}},
+                {"worker_id": {"$in": w_match}},
+            ]
+        else:
+            query["uploaded_by_id"] = {"$in": user_match}
+    elif worker_id:
+        query["worker_id"] = {"$in": [str(worker_id), worker_id]}
+
     if verification_status:
         query["verification_status"] = verification_status
-    if worker_id:
-        query["worker_id"] = str(worker_id)
 
     total = await db.evidence.count_documents(query)
     cursor = db.evidence.find(query).skip(skip).limit(limit).sort("created_at", -1)
@@ -96,12 +110,13 @@ async def create_evidence(
     db: AsyncIOMotorDatabase = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> EvidenceResponse:
-    worker_doc = await db.workers.find_one({"id": str(body.worker_id)})
+    id_q = {"$in": [str(body.worker_id), body.worker_id]}
+    worker_doc = await db.workers.find_one({"$or": [{"id": id_q}, {"user_id": id_q}]})
     if not worker_doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Worker not found")
 
     worker = WorkerProfile.from_mongo(worker_doc)
-    if current_user.role == UserRole.WORKER and worker.user_id != current_user.id:
+    if current_user.role == UserRole.WORKER and str(worker.user_id) != str(current_user.id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
     try:
@@ -112,7 +127,7 @@ async def create_evidence(
 
     record = EvidenceRecord(
         id=uuid.uuid4(),
-        worker_id=body.worker_id,
+        worker_id=worker.id,
         assessment_id=body.assessment_id,
         uploaded_by_id=current_user.id,
         evidence_type=ev_type.value,
@@ -154,12 +169,13 @@ async def upload_evidence_file(
     db: AsyncIOMotorDatabase = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> EvidenceResponse:
-    worker_doc = await db.workers.find_one({"id": str(worker_id)})
+    id_q = {"$in": [str(worker_id), worker_id]}
+    worker_doc = await db.workers.find_one({"$or": [{"id": id_q}, {"user_id": id_q}]})
     if not worker_doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Worker not found")
 
     worker = WorkerProfile.from_mongo(worker_doc)
-    if current_user.role == UserRole.WORKER and worker.user_id != current_user.id:
+    if current_user.role == UserRole.WORKER and str(worker.user_id) != str(current_user.id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
     try:
@@ -211,12 +227,15 @@ async def get_evidence(
     db: AsyncIOMotorDatabase = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> EvidenceResponse:
-    doc = await db.evidence.find_one({"id": str(evidence_id)})
+    id_q = {"$in": [str(evidence_id), evidence_id]}
+    doc = await db.evidence.find_one({"id": id_q})
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evidence not found")
 
     record = EvidenceRecord.from_mongo(doc)
-    _assert_evidence_access(record, current_user)
+    worker_doc = await db.workers.find_one({"id": {"$in": [str(record.worker_id), record.worker_id]}})
+    worker_user_id = worker_doc.get("user_id") if worker_doc else None
+    _assert_evidence_access(record, current_user, worker_user_id)
     return EvidenceResponse.model_validate(record)
 
 
@@ -231,12 +250,15 @@ async def update_evidence(
     db: AsyncIOMotorDatabase = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> EvidenceResponse:
-    doc = await db.evidence.find_one({"id": str(evidence_id)})
+    id_q = {"$in": [str(evidence_id), evidence_id]}
+    doc = await db.evidence.find_one({"id": id_q})
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evidence not found")
 
     record = EvidenceRecord.from_mongo(doc)
-    _assert_evidence_access(record, current_user)
+    worker_doc = await db.workers.find_one({"id": {"$in": [str(record.worker_id), record.worker_id]}})
+    worker_user_id = worker_doc.get("user_id") if worker_doc else None
+    _assert_evidence_access(record, current_user, worker_user_id)
 
     if record.verification_status != EvidenceVerificationStatus.UNVERIFIED.value:
         raise HTTPException(
@@ -246,7 +268,7 @@ async def update_evidence(
 
     update_data = body.model_dump(exclude_unset=True)
     update_data["updated_at"] = datetime.now(timezone.utc)
-    await db.evidence.update_one({"id": str(evidence_id)}, {"$set": update_data})
+    await db.evidence.update_one({"id": id_q}, {"$set": update_data})
 
     updated_doc = await db.evidence.find_one({"id": str(evidence_id)})
     return EvidenceResponse.model_validate(EvidenceRecord.from_mongo(updated_doc))

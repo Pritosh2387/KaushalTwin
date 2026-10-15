@@ -13,69 +13,135 @@ import {
   ChevronRight,
   ShieldCheck,
   Sparkles,
-  Compass
+  Compass,
+  User,
+  Briefcase
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 export function Sidebar({ collapsed, onToggle }) {
-  const { user } = useAuth();
+  const { user, isWorker, isAssessor, isAdmin } = useAuth();
 
-  const navItems = [
-    {
-      to: '/dashboard',
-      label: 'Dashboard',
-      icon: LayoutDashboard,
-      roles: ['ASSESSOR', 'ADMIN', 'WORKER'],
-    },
-    {
-      to: '/workers',
-      label: 'Candidates',
-      icon: Users,
-      roles: ['ASSESSOR', 'ADMIN'],
-    },
-    {
-      to: '/assessments',
-      label: 'Assessments',
-      icon: ClipboardCheck,
-      roles: ['ASSESSOR', 'ADMIN', 'WORKER'],
-    },
-    {
-      to: '/evidence',
-      label: 'Evidence Review',
-      icon: FileCheck2,
-      roles: ['ASSESSOR', 'ADMIN', 'WORKER'],
-    },
-    {
-      to: '/competencies',
-      label: 'Competency Matrix',
-      icon: Cpu,
-      roles: ['ASSESSOR', 'ADMIN'],
-      badge: 'Twin',
-    },
-    {
-      to: '/reports',
-      label: 'Reports & Dossiers',
-      icon: FileText,
-      roles: ['ASSESSOR', 'ADMIN', 'WORKER'],
-    },
-    {
-      to: '/audit',
-      label: 'Audit History',
-      icon: History,
-      roles: ['ASSESSOR', 'ADMIN'],
-    },
-    {
-      to: '/settings',
-      label: 'System Settings',
-      icon: Settings,
-      roles: ['ASSESSOR', 'ADMIN', 'WORKER'],
-    },
-  ];
+  // Define navigation items based on user role
+  let navItems = [];
 
-  const userRole = user?.role || 'ASSESSOR';
-  const filteredNavItems = navItems.filter((item) =>
-    item.roles.includes(userRole)
-  );
+  if (isWorker) {
+    // Worker-specific navigation
+    navItems = [
+      {
+        to: '/dashboard',
+        label: 'Dashboard',
+        icon: LayoutDashboard,
+        roles: ['WORKER'],
+      },
+      {
+        to: '/workers/profile',
+        label: 'My Profile',
+        icon: User,
+        roles: ['WORKER'],
+      },
+      {
+        to: '/workers/experience',
+        label: 'My Work Experience',
+        icon: Briefcase,
+        roles: ['WORKER'],
+      },
+      {
+        to: '/competencies',
+        label: 'My Skills',
+        icon: Cpu,
+        roles: ['WORKER'],
+        badge: 'Twin',
+      },
+      {
+        to: '/evidence',
+        label: 'My Evidence',
+        icon: FileCheck2,
+        roles: ['WORKER'],
+      },
+      {
+        to: '/assessments',
+        label: 'My Assessments',
+        icon: ClipboardCheck,
+        roles: ['WORKER'],
+      },
+      {
+        to: '/reports',
+        label: 'My Reports',
+        icon: FileText,
+        roles: ['WORKER'],
+      },
+      {
+        to: '/settings',
+        label: 'Account Settings',
+        icon: Settings,
+        roles: ['WORKER'],
+      },
+    ];
+  } else if (isAssessor || isAdmin) {
+    // Assessor/Admin navigation (existing)
+    navItems = [
+      {
+        to: '/dashboard',
+        label: 'Dashboard',
+        icon: LayoutDashboard,
+        roles: ['ASSESSOR', 'ADMIN'],
+      },
+      {
+        to: '/workers',
+        label: 'Candidates',
+        icon: Users,
+        roles: ['ASSESSOR', 'ADMIN'],
+      },
+      {
+        to: '/assessments',
+        label: 'Assessments',
+        icon: ClipboardCheck,
+        roles: ['ASSESSOR', 'ADMIN'],
+      },
+      {
+        to: '/evidence',
+        label: 'Evidence Review',
+        icon: FileCheck2,
+        roles: ['ASSESSOR', 'ADMIN'],
+      },
+      {
+        to: '/competencies',
+        label: 'Competency Matrix',
+        icon: Cpu,
+        roles: ['ASSESSOR', 'ADMIN'],
+        badge: 'Twin',
+      },
+      {
+        to: '/reports',
+        label: 'Reports & Dossiers',
+        icon: FileText,
+        roles: ['ASSESSOR', 'ADMIN'],
+      },
+      {
+        to: '/audit',
+        label: 'Audit History',
+        icon: History,
+        roles: ['ASSESSOR', 'ADMIN'],
+      },
+      {
+        to: '/settings',
+        label: 'System Settings',
+        icon: Settings,
+        roles: ['ASSESSOR', 'ADMIN'],
+      },
+    ];
+  } else {
+    // Fallback (shouldn't happen in practice)
+    navItems = [
+      {
+        to: '/dashboard',
+        label: 'Dashboard',
+        icon: LayoutDashboard,
+        roles: ['ASSESSOR', 'ADMIN', 'WORKER'],
+      },
+    ];
+  }
 
   return (
     <aside
@@ -120,7 +186,7 @@ export function Sidebar({ collapsed, onToggle }) {
 
       {/* Navigation Links */}
       <nav className="flex-1 px-2.5 py-4 space-y-1 overflow-y-auto">
-        {filteredNavItems.map((item) => {
+        {navItems.map((item) => {
           const Icon = item.icon;
           return (
             <NavLink
@@ -157,15 +223,17 @@ export function Sidebar({ collapsed, onToggle }) {
         </div>
       </nav>
 
-      {/* Bottom Assessor Compliance Notice */}
+      {/* Bottom Compliance Notice */}
       {!collapsed && (
         <div className="p-3.5 mx-2.5 mb-3 bg-[#050505] border border-white/10 rounded-none text-xs space-y-1.5 specular-top-edge">
           <div className="flex items-center gap-1.5 text-white font-mono text-[10px] tracking-wider uppercase">
             <ShieldCheck className="w-3.5 h-3.5 text-white" />
-            <span>Assessor Governance</span>
+            <span>{isWorker ? 'RPL Governance' : 'Assessor Governance'}</span>
           </div>
           <p className="text-[10px] text-zinc-400 leading-tight font-light font-sans">
-            AI provides recommendations only. Certified human assessors make all final certification decisions.
+            {isWorker
+              ? 'AI provides skill recommendations only. Certified human assessors make all final RPL certification decisions.'
+              : 'AI provides recommendations only. Certified human assessors make all final certification decisions.'}
           </p>
         </div>
       )}

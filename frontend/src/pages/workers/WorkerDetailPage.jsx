@@ -25,8 +25,8 @@ import { Tabs } from '../../components/ui/Tabs';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { Alert } from '../../components/ui/Alert';
 import { Modal } from '../../components/ui/Modal';
-import { Select } from '../../components/ui/Select';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { formatDate } from '../../lib/date';
 
 export function WorkerDetailPage() {
   const { id } = useParams();
@@ -261,7 +261,7 @@ export function WorkerDetailPage() {
             <div>
               <span className="text-zinc-500 text-[10px]">Enrolled Date:</span>
               <p className="text-zinc-300 text-[11px]">
-                {new Date(worker.created_at).toLocaleDateString()}
+                {formatDate(worker.created_at)}
               </p>
             </div>
             <div className="pt-4 border-t border-white/10">
@@ -316,7 +316,7 @@ export function WorkerDetailPage() {
                         <StatusBadge status={a.status} size="sm" />
                       </div>
                       <div className="text-[10px] text-zinc-500 mt-0.5">
-                        ID: #{a.id.slice(0, 8)} • Created: {new Date(a.created_at).toLocaleDateString()}
+                        ID: #{a.id.slice(0, 8)} • Created: {formatDate(a.created_at)}
                       </div>
                     </div>
                     <Button variant="outline" size="sm" className="text-[10px]">
@@ -368,7 +368,7 @@ export function WorkerDetailPage() {
                         <StatusBadge status={ev.verification_status} size="sm" />
                       </div>
                       <div className="text-[10px] text-zinc-500 mt-0.5">
-                        Type: {ev.evidence_type} • NOS: {ev.nos_id || 'Pending'} • {new Date(ev.created_at).toLocaleDateString()}
+                        Type: {ev.evidence_type} • NOS: {ev.nos_id || 'Pending'} • {formatDate(ev.created_at)}
                       </div>
                     </div>
                   </div>
