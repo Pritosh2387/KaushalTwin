@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { AppLayout } from './components/layout/AppLayout';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 // Pages
 import { LandingPage } from './pages/landing/LandingPage';
@@ -39,7 +40,8 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <BrowserRouter>
+        <ErrorBoundary>
+          <BrowserRouter>
           <Routes>
             {/* Cinematic Hero Landing Page */}
             <Route path="/" element={<LandingPage />} />
@@ -129,7 +131,8 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>
-      </AuthProvider>
-    </QueryClientProvider>
-  );
+      </ErrorBoundary>
+    </AuthProvider>
+  </QueryClientProvider>
+);
 }

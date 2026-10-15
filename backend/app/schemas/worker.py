@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class WorkerCreateRequest(BaseModel):
@@ -33,6 +33,7 @@ class WorkerUpdateRequest(BaseModel):
     languages: Optional[list[str]] = None
     previous_employment: Optional[str] = None
     informal_work_description: Optional[str] = None
+    work_narrative: Optional[str] = Field(None, max_length=10000)
 
 
 class WorkerResponse(BaseModel):
@@ -52,10 +53,40 @@ class WorkerResponse(BaseModel):
     languages: list[str] = Field(default_factory=list)
     previous_employment: Optional[str] = None
     informal_work_description: Optional[str] = None
+    work_narrative: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class WorkerNarrativeRequest(BaseModel):
+    narrative: str = Field(..., min_length=5, max_length=10000, description="Worker's spoken or typed work narrative")
+
+    @field_validator("narrative")
+    @classmethod
+    def narrative_not_blank(cls, v: str) -> str:
+        if not v or not v.strip() or len(v.strip()) < 5:
+            raise ValueError("Narrative must contain at least 5 characters describing your work experience")
+        return v.strip()
+
+
+class WorkerNarrativeAnalyzeRequest(BaseModel):
+    narrative: Optional[str] = Field(None, max_length=10000)
+    language: str = Field("en", description="Language code (en or hi)")
+
+
+class WorkerNarrativeAnalyzeResponse(BaseModel):
+    worker_id: uuid.UUID
+    trade: str
+    language: str
+    narrative: str
+    extracted_skills: list[dict] = Field(default_factory=list)
+    nos_mappings: list[dict] = Field(default_factory=list)
+    disclaimer: str = (
+        "AI suggestions are strictly advisory and awaiting assessor review. "
+        "These suggestions do not represent official certification or assessor verification."
+    )
 
 
 class WorkerListResponse(BaseModel):

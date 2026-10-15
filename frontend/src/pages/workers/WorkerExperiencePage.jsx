@@ -19,6 +19,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Alert } from '../../components/ui/Alert';
 import { Skeleton } from '../../components/ui/Skeleton';
+import { TellUsAboutYourWork } from '../../components/worker/TellUsAboutYourWork';
 
 export function WorkerExperiencePage() {
   const navigate = useNavigate();
@@ -248,6 +249,9 @@ export function WorkerExperiencePage() {
       ) : (
         /* Experience View */
         <div className="space-y-6">
+          {/* Prominent Voice & Text Work Narrative Entry */}
+          <TellUsAboutYourWork />
+
           {/* Overview Banner */}
           <div className="bg-[#050505] border border-white/10 p-6 sm:p-8 specular-top-edge">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

@@ -43,6 +43,24 @@ export const workersApi = {
     return data;
   },
 
+  saveNarrative: async (narrative) => {
+    const { data } = await apiClient.patch('/api/v1/workers/me/narrative', { narrative });
+    return data;
+  },
+
+  analyzeNarrative: async ({ narrative, language = 'en' } = {}) => {
+    const { data } = await apiClient.post('/api/v1/workers/me/analyze-narrative', {
+      narrative,
+      language,
+    });
+    return data;
+  },
+
+  updateMyProfile: async (updateData) => {
+    const { data } = await apiClient.patch('/api/v1/workers/me', updateData);
+    return data;
+  },
+
   // Aliases for compatibility
   getAll: async (params) => workersApi.getWorkers(params),
   getById: async (id) => workersApi.getWorker(id),

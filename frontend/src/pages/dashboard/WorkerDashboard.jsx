@@ -14,8 +14,9 @@ import {
   Award,
   CheckCircle2,
   AlertCircle,
+  Plus,
+  Mic,
   HelpCircle,
-  Plus
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { workersApi } from '../../api/workers.api';
@@ -24,6 +25,7 @@ import { Button } from '../../components/ui/Button';
 import { StatusBadge } from '../../components/ui/Badge';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { formatDate } from '../../lib/date';
+import { TellUsAboutYourWork } from '../../components/worker/TellUsAboutYourWork';
 
 export function WorkerDashboard() {
   const { user } = useAuth();
@@ -180,6 +182,15 @@ export function WorkerDashboard() {
       cta: 'Add Work Experience',
       link: '/workers/experience',
       icon: Briefcase,
+      urgency: 'high',
+    };
+  } else if (!worker.work_narrative && !worker.informal_work_description) {
+    nextAction = {
+      title: 'Tell Us About Your Work',
+      desc: 'Speak or type naturally about what work you do, what tools you use, and your practical background.',
+      cta: 'Describe My Work',
+      link: '/workers/experience',
+      icon: Mic,
       urgency: 'high',
     };
   } else if (evidenceList.length === 0) {
@@ -408,6 +419,9 @@ export function WorkerDashboard() {
           </Button>
         </div>
       </div>
+
+      {/* 3.5. Prominent Section: Tell Us About Your Work (Voice & Text) */}
+      <TellUsAboutYourWork />
 
       {/* 4. Personal Overview Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

@@ -29,11 +29,16 @@ from app.schemas.worker import (
     WorkerResponse,
     WorkerListResponse,
     WorkerCompetencyProfileResponse,
+    WorkerNarrativeRequest,
+    WorkerNarrativeAnalyzeRequest,
+    WorkerNarrativeAnalyzeResponse,
 )
 from app.schemas.assessment import AssessmentResponse
 from app.schemas.evidence import EvidenceResponse
+from app.db.models.assessment import Assessment
 from app.db.models.mongo_models import EvidenceRecord
 from app.services import audit_service
+from ml.services.skill_service import extract_skills, map_skills_to_nos
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/workers", tags=["Workers"])
@@ -132,6 +137,36 @@ def _match_id(val: uuid.UUID | str) -> dict:
         return {"$eq": s_val}
 
 
+async def _resolve_current_worker(db: AsyncIOMotorDatabase, current_user: User) -> WorkerProfile:
+    """Resolve the WorkerProfile document for the authenticated user, or auto-initialize one."""
+    user_q = _match_id(current_user.id)
+    doc = await db.workers.find_one({"user_id": user_q})
+    if not doc and current_user.email:
+        doc = await db.workers.find_one({"email": current_user.email})
+    if not doc and current_user.name:
+        doc = await db.workers.find_one({"full_name": current_user.name})
+        if not doc:
+            doc = await db.workers.find_one({"full_name": {"$regex": f"^{current_user.name}", "$options": "i"}})
+    if doc and not doc.get("user_id"):
+        await db.workers.update_one({"_id": doc["_id"]}, {"$set": {"user_id": str(current_user.id)}})
+        doc["user_id"] = str(current_user.id)
+
+    if not doc:
+        new_worker = WorkerProfile(
+            id=uuid.uuid4(),
+            user_id=current_user.id,
+            full_name=current_user.name,
+            email=current_user.email,
+            trade="General",
+            years_of_experience=0,
+            assessment_status="NOT_STARTED",
+        )
+        await db.workers.insert_one(new_worker.to_mongo())
+        doc = new_worker.to_mongo()
+
+    return WorkerProfile.from_mongo(doc)
+
+
 @router.get(
     "/me",
     response_model=WorkerResponse,
@@ -146,36 +181,163 @@ async def get_my_worker_profile(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Only users with WORKER role have a worker profile",
         )
-    user_q = _match_id(current_user.id)
-    doc = await db.workers.find_one({"user_id": user_q})
-    if not doc:
-        # Fallback search by email or name
-        if current_user.email:
-            doc = await db.workers.find_one({"email": current_user.email})
-        if not doc and current_user.name:
-            doc = await db.workers.find_one({"full_name": current_user.name})
-            if not doc:
-                doc = await db.workers.find_one({"full_name": {"$regex": f"^{current_user.name}", "$options": "i"}})
-        if doc:
-            await db.workers.update_one({"_id": doc["_id"]}, {"$set": {"user_id": str(current_user.id)}})
-            doc["user_id"] = str(current_user.id)
-
-    if not doc:
-        # Auto-initialize a fresh worker profile for the registered worker
-        new_worker = WorkerProfile(
-            id=uuid.uuid4(),
-            user_id=current_user.id,
-            full_name=current_user.name,
-            email=current_user.email,
-            trade="General",
-            years_of_experience=0,
-            assessment_status="NOT_STARTED",
-        )
-        await db.workers.insert_one(new_worker.to_mongo())
-        doc = new_worker.to_mongo()
-
-    worker = WorkerProfile.from_mongo(doc)
+    worker = await _resolve_current_worker(db, current_user)
     return WorkerResponse.model_validate(worker)
+
+
+@router.patch(
+    "/me",
+    response_model=WorkerResponse,
+    summary="Update current authenticated worker's profile",
+)
+async def update_my_worker_profile(
+    body: WorkerUpdateRequest,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> WorkerResponse:
+    if current_user.role != UserRole.WORKER:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only users with WORKER role have a worker profile",
+        )
+    worker = await _resolve_current_worker(db, current_user)
+    update_data = body.model_dump(exclude_unset=True)
+    update_data["updated_at"] = datetime.now(timezone.utc)
+    if "work_narrative" in update_data and "informal_work_description" not in update_data:
+        update_data["informal_work_description"] = update_data["work_narrative"]
+    elif "informal_work_description" in update_data and "work_narrative" not in update_data:
+        update_data["work_narrative"] = update_data["informal_work_description"]
+
+    target_id_q = _match_id(worker.id)
+    await db.workers.update_one({"id": target_id_q}, {"$set": update_data})
+    updated_doc = await db.workers.find_one({"id": target_id_q})
+    updated_worker = WorkerProfile.from_mongo(updated_doc)
+
+    await audit_service.record_event(
+        db,
+        action="WORKER_UPDATED",
+        entity_type="WorkerProfile",
+        entity_id=str(worker.id),
+        actor_user_id=current_user.id,
+        actor_label=current_user.email,
+        metadata={"updated_fields": list(update_data.keys())},
+    )
+    return WorkerResponse.model_validate(updated_worker)
+
+
+@router.patch(
+    "/me/narrative",
+    response_model=WorkerResponse,
+    summary="Save work experience narrative for current authenticated worker",
+)
+async def save_my_work_narrative(
+    body: WorkerNarrativeRequest,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> WorkerResponse:
+    if current_user.role != UserRole.WORKER:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only users with WORKER role have a work narrative",
+        )
+    worker = await _resolve_current_worker(db, current_user)
+    now = datetime.now(timezone.utc)
+    target_id_q = _match_id(worker.id)
+    await db.workers.update_one(
+        {"id": target_id_q},
+        {
+            "$set": {
+                "work_narrative": body.narrative,
+                "informal_work_description": body.narrative,
+                "updated_at": now,
+            }
+        },
+    )
+    updated_doc = await db.workers.find_one({"id": target_id_q})
+    updated_worker = WorkerProfile.from_mongo(updated_doc)
+
+    await audit_service.record_event(
+        db,
+        action="WORKER_NARRATIVE_UPDATED",
+        entity_type="WorkerProfile",
+        entity_id=str(worker.id),
+        actor_user_id=current_user.id,
+        actor_label=current_user.email,
+        metadata={"narrative_length": len(body.narrative)},
+    )
+    return WorkerResponse.model_validate(updated_worker)
+
+
+@router.post(
+    "/me/analyze-narrative",
+    response_model=WorkerNarrativeAnalyzeResponse,
+    summary="Extract skills and map candidate NOS standards from worker's narrative",
+)
+async def analyze_my_work_narrative(
+    body: WorkerNarrativeAnalyzeRequest,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> WorkerNarrativeAnalyzeResponse:
+    if current_user.role != UserRole.WORKER:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only users with WORKER role can analyze work narratives",
+        )
+    worker = await _resolve_current_worker(db, current_user)
+    text_to_analyze = body.narrative or worker.work_narrative or worker.informal_work_description
+    if not text_to_analyze or not text_to_analyze.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Please provide or save a work narrative before analyzing skills.",
+        )
+
+    # Normalize trade context for ML engine
+    raw_trade = (worker.trade or "electrician").lower()
+    if "electric" in raw_trade:
+        trade_context = "electrician"
+    elif "weld" in raw_trade:
+        trade_context = "welder"
+    elif "plumb" in raw_trade:
+        trade_context = "plumber"
+    elif "mason" in raw_trade:
+        trade_context = "mason"
+    else:
+        trade_context = "general"
+
+    lang = body.language if body.language in ("en", "hi") else "en"
+
+    # 1. Skill Extraction
+    extracted_skills_list: list[dict] = []
+    try:
+        extraction_res = extract_skills(
+            text=text_to_analyze,
+            language=lang,
+            trade=trade_context,
+        )
+        extracted_skills_list = [s.model_dump() for s in extraction_res.skills]
+    except Exception as exc:
+        logger.warning("Error in worker narrative skill extraction: %s", exc)
+
+    # 2. NOS Candidate Mapping
+    nos_mappings_list: list[dict] = []
+    if extracted_skills_list:
+        try:
+            nos_res = map_skills_to_nos(
+                skills=extracted_skills_list,
+                top_k=3,
+            )
+            nos_mappings_list = nos_res
+        except Exception as exc:
+            logger.warning("Error in worker narrative NOS mapping: %s", exc)
+
+    return WorkerNarrativeAnalyzeResponse(
+        worker_id=worker.id,
+        trade=worker.trade,
+        language=lang,
+        narrative=text_to_analyze,
+        extracted_skills=extracted_skills_list,
+        nos_mappings=nos_mappings_list,
+    )
 
 
 @router.get(
@@ -219,6 +381,10 @@ async def update_worker(
 
     update_data = body.model_dump(exclude_unset=True)
     update_data["updated_at"] = datetime.now(timezone.utc)
+    if "work_narrative" in update_data and "informal_work_description" not in update_data:
+        update_data["informal_work_description"] = update_data["work_narrative"]
+    elif "informal_work_description" in update_data and "work_narrative" not in update_data:
+        update_data["work_narrative"] = update_data["informal_work_description"]
 
     target_id_q = _match_id(worker.id)
     await db.workers.update_one({"id": target_id_q}, {"$set": update_data})
@@ -260,7 +426,7 @@ async def get_worker_assessments(
     cursor = db.assessments.find({"worker_id": w_q})
     items = []
     async for a_doc in cursor:
-        items.append(AssessmentResponse.model_validate(a_doc))
+        items.append(AssessmentResponse.model_validate(Assessment.from_mongo(a_doc)))
     return items
 
 

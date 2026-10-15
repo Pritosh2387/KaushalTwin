@@ -53,6 +53,10 @@ class MongoBaseModel(BaseModel):
         for k, v in list(doc_copy.items()):
             if isinstance(v, datetime) and v.tzinfo is None:
                 doc_copy[k] = v.replace(tzinfo=timezone.utc)
+        if "work_narrative" not in doc_copy or doc_copy.get("work_narrative") is None:
+            doc_copy["work_narrative"] = doc_copy.get("informal_work_description")
+        if "informal_work_description" not in doc_copy or doc_copy.get("informal_work_description") is None:
+            doc_copy["informal_work_description"] = doc_copy.get("work_narrative")
         return cls.model_validate(doc_copy)
 
 
@@ -84,6 +88,7 @@ class WorkerProfile(MongoBaseModel):
     languages: list[str] = Field(default_factory=list)
     previous_employment: Optional[str] = None
     informal_work_description: Optional[str] = None
+    work_narrative: Optional[str] = None
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 

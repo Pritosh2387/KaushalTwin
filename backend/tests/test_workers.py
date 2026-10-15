@@ -279,3 +279,109 @@ async def test_worker_cannot_get_other_worker_evidence(client: AsyncClient, crea
     assert get_resp.status_code == 403
 
 
+@pytest.mark.asyncio
+async def test_worker_save_and_retrieve_narrative(client: AsyncClient, create_user):
+    w_user, w_token = await create_user("Narrative Worker", "w_narrative@example.com", role=UserRole.WORKER)
+    headers = {"Authorization": f"Bearer {w_token}"}
+
+    sample_narrative = (
+        "I have worked as an electrician for six years. I install domestic wiring, "
+        "replace switches and fans, install MCBs, and use a tester to find electrical faults."
+    )
+
+    # 1. Save narrative via PATCH /api/v1/workers/me/narrative
+    save_resp = await client.patch(
+        "/api/v1/workers/me/narrative",
+        json={"narrative": sample_narrative},
+        headers=headers,
+    )
+    assert save_resp.status_code == 200
+    saved_data = save_resp.json()
+    assert saved_data["work_narrative"] == sample_narrative
+
+    # 2. Retrieve narrative via GET /api/v1/workers/me
+    get_resp = await client.get("/api/v1/workers/me", headers=headers)
+    assert get_resp.status_code == 200
+    get_data = get_resp.json()
+    assert get_data["work_narrative"] == sample_narrative
+
+    # 3. Edit narrative
+    updated_narrative = sample_narrative + " Also experienced in conduit bending."
+    edit_resp = await client.patch(
+        "/api/v1/workers/me/narrative",
+        json={"narrative": updated_narrative},
+        headers=headers,
+    )
+    assert edit_resp.status_code == 200
+    assert edit_resp.json()["work_narrative"] == updated_narrative
+
+
+@pytest.mark.asyncio
+async def test_worker_narrative_validation(client: AsyncClient, create_user):
+    w_user, w_token = await create_user("Validation Worker", "w_val@example.com", role=UserRole.WORKER)
+    headers = {"Authorization": f"Bearer {w_token}"}
+
+    # Empty narrative -> 422
+    empty_resp = await client.patch(
+        "/api/v1/workers/me/narrative",
+        json={"narrative": "   "},
+        headers=headers,
+    )
+    assert empty_resp.status_code == 422
+
+    # Narrative exceeding max_length (10000) -> 422
+    long_resp = await client.patch(
+        "/api/v1/workers/me/narrative",
+        json={"narrative": "a" * 10005},
+        headers=headers,
+    )
+    assert long_resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_worker_narrative_analysis(client: AsyncClient, create_user):
+    w_user, w_token = await create_user("Analysis Worker", "w_analysis@example.com", role=UserRole.WORKER)
+    headers = {"Authorization": f"Bearer {w_token}"}
+
+    narrative = (
+        "I have worked as an electrician for six years. I install domestic wiring, "
+        "replace switches and fans, install MCBs, and use a tester to find electrical faults."
+    )
+
+    analyze_resp = await client.post(
+        "/api/v1/workers/me/analyze-narrative",
+        json={"narrative": narrative, "language": "en"},
+        headers=headers,
+    )
+    assert analyze_resp.status_code == 200
+    res_data = analyze_resp.json()
+    assert "extracted_skills" in res_data
+    assert len(res_data["extracted_skills"]) > 0
+    assert "nos_mappings" in res_data
+    assert "AI suggestions are strictly advisory" in res_data["disclaimer"]
+
+
+@pytest.mark.asyncio
+async def test_worker_cannot_edit_other_worker_narrative(client: AsyncClient, create_user):
+    w1_user, w1_token = await create_user("Worker One Narrative", "w1_narr@example.com", role=UserRole.WORKER)
+    w2_user, w2_token = await create_user("Worker Two Narrative", "w2_narr@example.com", role=UserRole.WORKER)
+    assessor, a_token = await create_user("Assessor Narrative", "assessor_narr@example.com", role=UserRole.ASSESSOR)
+
+    # Assessor registers Worker One
+    create_resp = await client.post(
+        "/api/v1/workers",
+        json={"full_name": "Worker One Narrative", "trade": "electrician", "years_of_experience": 5, "user_id": str(w1_user.id)},
+        headers={"Authorization": f"Bearer {a_token}"},
+    )
+    w1_profile_id = create_resp.json()["id"]
+
+    # Worker Two attempts to PATCH Worker One's narrative -> 403 Forbidden
+    hack_resp = await client.patch(
+        f"/api/v1/workers/{w1_profile_id}",
+        json={"work_narrative": "Tampered narrative from unauthorized worker"},
+        headers={"Authorization": f"Bearer {w2_token}"},
+    )
+    assert hack_resp.status_code == 403
+
+
+
