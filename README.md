@@ -21,26 +21,26 @@
 
 - [Overview](#-overview)
 - [Core principles](#-core-principles)
-- [🧩 Capabilities](#-capabilities)
-- [🏗️ Architecture](#️-architecture)
-- [🗂️ Repository structure](#️-repository-structure)
-- [🧰 Technology stack](#-technology-stack)
-- [🚀 Quick start — Docker Compose](#-quick-start--docker-compose)
-- [🛠️ Run without Docker](#️-run-without-docker)
-- [🔐 Demo accounts](#-demo-accounts)
-- [🧠 ML modules](#-ml-modules)
-- [🔌 API reference](#-api-reference)
+- [Capabilities](#-capabilities)
+- [Architecture](#️-architecture)
+- [Repository structure](#️-repository-structure)
+- [Technology stack](#-technology-stack)
+- [Quick start — Docker Compose](#-quick-start--docker-compose)
+- [Run without Docker](#️-run-without-docker)
+- [Demo accounts](#-demo-accounts)
+- [ML modules](#-ml-modules)
+- [API reference](#-api-reference)
 - [🇮🇳 Official NOS data and provenance](#-official-nos-data-and-provenance)
-- [🧪 Testing and evaluation](#-testing-and-evaluation)
-- [⚙️ Configuration](#️-configuration)
-- [🧯 Troubleshooting](#-troubleshooting)
-- [🛡️ Security and production readiness](#️-security-and-production-readiness)
-- [🗺️ Roadmap](#️-roadmap)
-- [📚 References](#-references)
+- [Testing and evaluation](#-testing-and-evaluation)
+- [Configuration](#️-configuration)
+- [Troubleshooting](#-troubleshooting)
+- [Security and production readiness](#️-security-and-production-readiness)
+- [Roadmap](#️-roadmap)
+- [References](#-references)
 
 ---
 
-## ✨ Overview
+## Overview
 
 Recognition of Prior Learning enables people to have skills gained outside formal education assessed and recognised. KaushalTwin aims to support that process by connecting worker experience, evidence, occupational standards and assessor review in one workflow.
 
@@ -56,7 +56,7 @@ Recognition of Prior Learning enables people to have skills gained outside forma
 
 ### What this project is — and is not
 
-| ✅ It is | ⚠️ It is not |
+| It is | It is not |
 |---|---|
 | An RPL workflow and assessor decision-support prototype | An autonomous certification authority |
 | An integration of application APIs, ML logic and MongoDB persistence | Proof that every supported trade has been comprehensively covered |
@@ -65,7 +65,7 @@ Recognition of Prior Learning enables people to have skills gained outside forma
 
 ---
 
-## 🧭 Core principles
+## Core principles
 
 - **Evidence before confidence.** Recommendations should be grounded in available evidence and its provenance.
 - **Abstention is an outcome.** When evidence is insufficient, conflicting or outside the system's ability to judge, the system can recommend more evidence or human review.
@@ -76,7 +76,7 @@ Recognition of Prior Learning enables people to have skills gained outside forma
 
 ---
 
-## 🧩 Capabilities
+## Capabilities
 
 | Capability | Purpose |
 |---|---|
@@ -95,7 +95,7 @@ Recognition of Prior Learning enables people to have skills gained outside forma
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```mermaid
 flowchart TD
@@ -132,7 +132,7 @@ flowchart TD
 
 ---
 
-## 🗂️ Repository structure
+## Repository structure
 
 The following is a high-level guide to the current project layout. Confirm exact filenames in the repository when extending the code.
 
@@ -174,7 +174,7 @@ KaushalTwin/
 
 ---
 
-## 🧰 Technology stack
+## Technology stack
 
 | Layer | Technologies |
 |---|---|
@@ -190,7 +190,7 @@ Optional providers or model libraries may require additional installation, downl
 
 ---
 
-## 🚀 Quick start — Docker Compose
+## Quick start — Docker Compose
 
 **Recommended for the most consistent local setup.** Docker Compose runs MongoDB, the backend and the frontend together.
 
@@ -279,7 +279,7 @@ docker compose down
 
 ---
 
-## 🛠️ Run without Docker
+## Run without Docker
 
 This mode runs the API, frontend and MongoDB as separate local processes. It is useful for debugging and hot reloading. **Docker Desktop is not needed**, but MongoDB must be installed and running locally.
 
@@ -437,7 +437,7 @@ MongoDB must already be installed and listening on `127.0.0.1:27017`. Manual fro
 
 ---
 
-## 🔐 Demo accounts
+## Demo accounts
 
 These accounts are for **local demonstration only**. They are created by the demo seeder; do not use these credentials in a public or production environment.
 
@@ -461,7 +461,7 @@ docker compose exec backend python -c "import asyncio; from seed_demo_data impor
 
 ---
 
-## 🧠 ML modules
+## ML modules
 
 The embedded ML layer is organized around ten connected areas. Exact routes are listed in the [API reference](#-api-reference) and can also be inspected in Swagger UI.
 
@@ -496,7 +496,7 @@ These are advisory states, not autonomous certification decisions. The assessor 
 
 ---
 
-## 🔌 API reference
+## API reference
 
 The following routes reflect the project's documented API surface. **The running OpenAPI schema at `/docs` is the definitive reference** for request fields, response models, authentication requirements and any route changes.
 
@@ -662,7 +662,7 @@ Review the implementation and source metadata before relying on any refreshed ou
 
 ---
 
-## 🧪 Testing and evaluation
+## Testing and evaluation
 
 ### Backend
 
@@ -717,7 +717,7 @@ The evaluation ground-truth fixture is marked `SYNTHETIC_FIXTURE_PENDING_EMPIRIC
 
 ---
 
-## ⚙️ Configuration
+## Configuration
 
 The current Compose configuration has been documented with these local development settings:
 
@@ -739,7 +739,7 @@ For manual local setup, the MongoDB hostname is `127.0.0.1`; `mongodb` is the se
 
 ---
 
-## 🧯 Troubleshooting
+## Troubleshooting
 
 ### Docker Compose cannot connect
 
@@ -792,7 +792,7 @@ The warning that the `version` field in Compose is obsolete is non-blocking; Com
 
 ---
 
-## 🛡️ Security and production readiness
+## Security and production readiness
 
 The current Docker Compose configuration is a **local development/demo setup**, not a production deployment template.
 
@@ -820,7 +820,7 @@ The current Docker Compose configuration is a **local development/demo setup**, 
 
 ---
 
-## 🗺️ Roadmap
+## Roadmap
 
 Potential areas for continued development, subject to repository status and project priorities:
 
@@ -835,7 +835,7 @@ These are possible future directions, not claims that every item is already impl
 
 ---
 
-## 📚 References
+## References
 
 - **Repository:** [Pritosh2387/KaushalTwin](https://github.com/Pritosh2387/KaushalTwin)
 - **National Qualifications Register (NQR):** [https://www.nqr.gov.in](https://www.nqr.gov.in)
