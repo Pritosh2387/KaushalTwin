@@ -19,7 +19,7 @@
 
 ## Contents
 
-- [✨ Overview](#-overview)
+- [Overview](#-overview)
 - [🧭 Core principles](#-core-principles)
 - [🧩 Capabilities](#-capabilities)
 - [🏗️ Architecture](#️-architecture)
