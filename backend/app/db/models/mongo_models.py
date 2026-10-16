@@ -110,6 +110,7 @@ class EvidenceRecord(MongoBaseModel):
     verification_status: str = "UNVERIFIED"
     verification_notes: Optional[str] = None
     verified_by_id: Optional[uuid.UUID] = None
+    verified_at: Optional[datetime] = None
     metadata_json: Optional[str] = None
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)

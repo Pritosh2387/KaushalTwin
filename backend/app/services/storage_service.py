@@ -126,3 +126,7 @@ def get_file_path(stored_path: str) -> Path:
         )
 
     return resolved
+
+
+resolve_file_path = get_file_path
+

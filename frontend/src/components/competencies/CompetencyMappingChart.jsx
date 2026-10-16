@@ -210,6 +210,42 @@ export function CompetencyMappingChart({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Data Sanitization
+  const validCompetencies = useMemo(() => {
+    return (Array.isArray(competencies) ? competencies : [])
+      .map(normalizeCompetency)
+      .filter(Boolean);
+  }, [competencies]);
+
+  const dimensionsCount = validCompetencies.length;
+  const canUseRadar = dimensionsCount >= 3;
+  // If fewer than 3 dimensions, STRICTLY use 'bar'. Only allow radar when dimensions >= 3
+  const activeView = canUseRadar ? (userViewMode || 'radar') : 'bar';
+
+  // Data for Bar Chart
+  const barChartData = useMemo(() => {
+    return validCompetencies.map((c, idx) => ({
+      id: c.nos_id || `comp-${idx}`,
+      nos_id: c.nos_id || '',
+      name: c.nos_id || c.shortName,
+      fullName: c.competency_name || c.name || c.nos_id || `Competency ${idx + 1}`,
+      displayName: c.displayName,
+      candidateScore: c.score,
+      benchmarkScore: c.benchmark,
+      isProficient: c.isProficient,
+      variance: c.variance,
+    }));
+  }, [validCompetencies]);
+
+  const dataMap = useMemo(() => {
+    const map = new Map();
+    barChartData.forEach((item, index) => {
+      map.set(item.id, item);
+      map.set(index, item);
+    });
+    return map;
+  }, [barChartData]);
+
   // 1. Loading State
   if (isLoading) {
     return (
@@ -260,16 +296,6 @@ export function CompetencyMappingChart({
     );
   }
 
-  // 3. Data Sanitization (Requirement 6: do not invent scores or fill missing values with fabricated data)
-  const validCompetencies = (Array.isArray(competencies) ? competencies : [])
-    .map(normalizeCompetency)
-    .filter(Boolean);
-
-  const dimensionsCount = validCompetencies.length;
-  const canUseRadar = dimensionsCount >= 3;
-  // If fewer than 3 dimensions, STRICTLY use 'bar'. Only allow radar when dimensions >= 3
-  const activeView = canUseRadar ? (userViewMode || 'radar') : 'bar';
-
   // 4. Empty State (Requirement 6: Handle empty data gracefully)
   if (dimensionsCount === 0) {
     return (
@@ -317,30 +343,6 @@ export function CompetencyMappingChart({
       </div>
     );
   }
-
-  // 5. Data for Bar Chart
-  const barChartData = useMemo(() => {
-    return validCompetencies.map((c, idx) => ({
-      id: c.nos_id || `comp-${idx}`,
-      nos_id: c.nos_id || '',
-      name: c.nos_id || c.shortName,
-      fullName: c.competency_name || c.name || c.nos_id || `Competency ${idx + 1}`,
-      displayName: c.displayName,
-      candidateScore: c.score,
-      benchmarkScore: c.benchmark,
-      isProficient: c.isProficient,
-      variance: c.variance,
-    }));
-  }, [validCompetencies]);
-
-  const dataMap = useMemo(() => {
-    const map = new Map();
-    barChartData.forEach((item, index) => {
-      map.set(item.id, item);
-      map.set(index, item);
-    });
-    return map;
-  }, [barChartData]);
 
   const barChartHeight = Math.max(260, dimensionsCount * (isMobile ? 95 : 85) + 60);
   const yAxisWidth = isMobile ? 150 : 220;

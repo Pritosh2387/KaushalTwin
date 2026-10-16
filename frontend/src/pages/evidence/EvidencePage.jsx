@@ -437,10 +437,13 @@ export function EvidencePage() {
               required
               value={uploadData.worker_id}
               onChange={(e) => setUploadData({ ...uploadData, worker_id: e.target.value })}
-              options={workers.map((w) => ({
-                value: w.id,
-                label: `${w.full_name || 'Worker'} (${w.trade || 'General'})`,
-              }))}
+              options={[
+                { value: '', label: 'Select candidate...' },
+                ...workers.map((w) => ({
+                  value: w.id,
+                  label: `${w.full_name || 'Worker'} (${w.trade || 'General'})`,
+                })),
+              ]}
             />
           )}
 

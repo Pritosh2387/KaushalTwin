@@ -77,54 +77,79 @@ def main():
     token = login["access_token"]
     print("  Assessor authenticated. JWT Token received.")
 
-    # 3. Create Worker Profile
-    print("\n[3] Creating Worker Profile (Ramesh Kumar, Electrician)...")
-    worker = request("POST", "/workers", {
-        "full_name": "Ramesh Kumar",
-        "trade": "electrician",
-        "years_of_experience": 6,
-        "experience_summary": "Main 6 saal se residential wiring, MCB distribution, aur fan installation karta hoon.",
-        "education_summary": "10th pass, on-the-job informal training.",
-    }, token=token)
-    if not worker:
-        return
-    worker_id = worker["id"]
-    print(f"  Worker Profile Created: ID={worker_id}, Trade={worker['trade']}, Exp={worker['years_of_experience']} yrs")
+    # 3. Create or find Worker Profile
+    print("\n[3] Checking / Creating Worker Profile (Ramesh Kumar, Electrician)...")
+    workers_list = request("GET", "/workers?limit=50", token=token)
+    existing_worker = None
+    if workers_list and isinstance(workers_list.get("items"), list):
+        for w in workers_list["items"]:
+            if w.get("full_name") == "Ramesh Kumar" and w.get("trade") == "electrician":
+                existing_worker = w
+                break
 
-    # 4. Create Assessment
-    print("\n[4] Creating Assessment Session...")
+    if existing_worker:
+        worker = existing_worker
+        print(f"  Existing Worker Profile Reused: ID={worker['id']}, Trade={worker['trade']}")
+    else:
+        worker = request("POST", "/workers", {
+            "full_name": "Ramesh Kumar",
+            "trade": "electrician",
+            "years_of_experience": 6,
+            "experience_summary": "Main 6 saal se residential wiring, MCB distribution, aur fan installation karta hoon.",
+            "education_summary": "10th pass, on-the-job informal training.",
+        }, token=token)
+        if not worker:
+            return
+        print(f"  Worker Profile Created: ID={worker['id']}, Trade={worker['trade']}, Exp={worker['years_of_experience']} yrs")
+    worker_id = worker["id"]
+
+    # 4. Create Assessment (or resume existing active assessment)
+    print("\n[4] Creating / Resuming Assessment Session...")
     assessment = request("POST", "/assessments", {
         "worker_id": worker_id,
         "trade": "electrician",
         "notes": "RPL Assessment candidate registered at ITI Kanpur center.",
     }, token=token)
     assessment_id = assessment["id"]
-    print(f"  Assessment Created: ID={assessment_id}, Status={assessment['status']}")
+    print(f"  Assessment Session Active: ID={assessment_id}, Status={assessment['status']}")
 
-    # Start assessment
-    started = request("POST", f"/assessments/{assessment_id}/start", token=token)
-    print(f"  Assessment Started: Status={started['status']}, StartedAt={started['started_at']}")
+    # Start assessment if still in DRAFT
+    if assessment.get("status") == "DRAFT":
+        started = request("POST", f"/assessments/{assessment_id}/start", token=token)
+        print(f"  Assessment Started: Status={started['status']}, StartedAt={started['started_at']}")
 
-    # 5. Submit Evidence
-    print("\n[5] Submitting Evidence Metadata...")
-    ev = request("POST", "/evidence", {
-        "worker_id": worker_id,
-        "assessment_id": assessment_id,
-        "evidence_type": "SELF_DECLARATION",
-        "source_type": "SELF",
-        "description": "Candidate self-declaration of 6 years residential wiring experience.",
-        "nos_id": "DEMO_NOS_004",
-    }, token=token)
-    ev_id = ev["id"]
-    print(f"  Evidence Record ID: {ev_id}, Status={ev['verification_status']}")
+    # 5. Submit Evidence (or find existing)
+    print("\n[5] Submitting / Checking Evidence...")
+    worker_ev = request("GET", f"/workers/{worker_id}/evidence", token=token)
+    ev_items = worker_ev.get("items", []) if isinstance(worker_ev, dict) else (worker_ev or [])
+    existing_ev = None
+    for item in ev_items:
+        if item.get("evidence_type") == "SELF_DECLARATION":
+            existing_ev = item
+            break
 
-    # Assessor verifies evidence
+    if existing_ev:
+        ev_id = existing_ev["id"]
+        print(f"  Existing Evidence Record Reused: ID={ev_id}, Status={existing_ev['verification_status']}")
+    else:
+        ev = request("POST", "/evidence", {
+            "worker_id": worker_id,
+            "assessment_id": assessment_id,
+            "evidence_type": "SELF_DECLARATION",
+            "source_type": "SELF",
+            "description": "Candidate self-declaration of 6 years residential wiring experience.",
+            "nos_id": "DEMO_NOS_004",
+        }, token=token)
+        ev_id = ev["id"]
+        print(f"  Evidence Record ID: {ev_id}, Status={ev['verification_status']}")
+
+    # Assessor reviews and verifies evidence
     print("\n[6] Assessor verifies evidence...")
     verified = request("POST", f"/evidence/{ev_id}/verify", {
         "verification_status": "VERIFIED",
-        "verification_notes": "Assessor confirmed practical familiarity with DB board wiring.",
+        "verification_notes": "Assessor confirmed practical familiarity with DB board wiring via onsite inspection.",
     }, token=token)
-    print(f"  Verification Updated: Status={verified['verification_status']}")
+    print(f"  Verification Updated: Status={verified.get('verification_status') if verified else 'Unchanged'}")
 
     # 6. Check ML Service & Run AI Pipeline
     print("\n[7] Triggering ML Pipeline via Backend (/assessments/{id}/analyze)...")

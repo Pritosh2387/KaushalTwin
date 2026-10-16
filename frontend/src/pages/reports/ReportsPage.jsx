@@ -169,7 +169,7 @@ export function ReportsPage() {
 
             <div className="text-right text-xs text-zinc-400">
               <div>GENERATED: {formatDateTime(report.generated_at)}</div>
-              <div>AUTHENTICATED BY: {latestDecision?.assessor_id || 'CERTIFIED_ASSESSOR'}</div>
+              <div>AUTHENTICATED BY: {latestDecision?.assessor_id || 'PENDING ASSESSOR REVIEW'}</div>
             </div>
           </div>
 
@@ -235,27 +235,31 @@ export function ReportsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 bg-[#050505]">
-                {(nosCompetencies.length > 0 ? nosCompetencies : [
-                  { nos_id: 'CSC/N0204', competency_name: 'Arc & Gas Welding Technique', score: 0.88 },
-                  { nos_id: 'CSC/N1335', competency_name: 'Workplace Safety & Hazard Control', score: 0.92 },
-                  { nos_id: 'CSC/N0205', competency_name: 'Blueprint & Engineering Drawings', score: 0.64 },
-                ]).map((c, i) => {
-                  const score = Math.round((c.score || c.confidence || 0.75) * 100);
-                  return (
-                    <tr key={i}>
-                      <td className="p-3 text-white font-bold">{c.nos_id}</td>
-                      <td className="p-3 text-zinc-300">{c.competency_name || c.nos_id}</td>
-                      <td className="p-3 text-white font-bold">{score}%</td>
-                      <td className="p-3">
-                        <span className={`px-2 py-0.5 text-[9px] border ${
-                          score >= 70 ? 'bg-white/10 border-white/20 text-white' : 'bg-[#0a0a0a] border-white/10 text-zinc-500'
-                        }`}>
-                          {score >= 70 ? 'BENCHMARK MET' : 'EVIDENCE GAP'}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {nosCompetencies.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="p-6 text-center text-zinc-500 font-sans text-xs">
+                      No evaluated NOS competency standards recorded yet. Run AI Analysis or assign practical tasks in the Assessment Workspace to evaluate competencies.
+                    </td>
+                  </tr>
+                ) : (
+                  nosCompetencies.map((c, i) => {
+                    const score = Math.round((c.score || c.confidence || 0.75) * 100);
+                    return (
+                      <tr key={i}>
+                        <td className="p-3 text-white font-bold">{c.nos_id}</td>
+                        <td className="p-3 text-zinc-300">{c.competency_name || c.nos_id}</td>
+                        <td className="p-3 text-white font-bold">{score}%</td>
+                        <td className="p-3">
+                          <span className={`px-2 py-0.5 text-[9px] border ${
+                            score >= 70 ? 'bg-white/10 border-white/20 text-white' : 'bg-[#0a0a0a] border-white/10 text-zinc-500'
+                          }`}>
+                            {score >= 70 ? 'BENCHMARK MET' : 'EVIDENCE GAP'}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
@@ -266,16 +270,22 @@ export function ReportsPage() {
               <ShieldCheck className="w-4 h-4 text-white" />
               <span>FINAL CERTIFIED HUMAN ASSESSOR VERDICT</span>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs pt-2">
-              <div>
-                <span className="text-zinc-500 text-[10px]">VERDICT:</span>
-                <p className="text-white font-bold mt-0.5">{latestDecision?.action || 'RECOMMENDATION_ACCEPTED'}</p>
+            {latestDecision ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs pt-2">
+                <div>
+                  <span className="text-zinc-500 text-[10px]">VERDICT:</span>
+                  <p className="text-white font-bold mt-0.5">{latestDecision.action}</p>
+                </div>
+                <div>
+                  <span className="text-zinc-500 text-[10px]">REMARKS:</span>
+                  <p className="text-zinc-300 mt-0.5">{latestDecision.comments || 'No remarks provided.'}</p>
+                </div>
               </div>
-              <div>
-                <span className="text-zinc-500 text-[10px]">REMARKS:</span>
-                <p className="text-zinc-300 mt-0.5">{latestDecision?.comments || 'Candidate demonstrated verified competencies in conformity with NCVET criteria.'}</p>
+            ) : (
+              <div className="p-4 bg-amber-950/20 border border-amber-500/20 text-xs text-amber-300/80 mt-2">
+                <strong>Pending Assessor Review:</strong> An authorized human assessor has not yet recorded a final certification decision for this assessment. In accordance with NCVET RPL guidelines, certification cannot be granted without explicit assessor verification.
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}

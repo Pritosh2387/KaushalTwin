@@ -355,61 +355,66 @@ export function AssessmentWorkspacePage() {
                 </p>
               </div>
               <span className="text-[10px] px-2 py-0.5 bg-[#0a0a0a] border border-white/15 text-zinc-300 font-sans">
-                {candidateCompetencies.length || 5} Competencies
+                {candidateCompetencies.length} Competencies
               </span>
             </div>
 
             <div className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {(candidateCompetencies.length > 0 ? candidateCompetencies : [
-                  { nos_id: 'CSC/N0204', competency_name: 'Arc & Gas Welding Technique', score: 0.88, evidence_count: 4 },
-                  { nos_id: 'CSC/N1335', competency_name: 'Workplace Safety & Hazard Control', score: 0.92, evidence_count: 5 },
-                  { nos_id: 'CSC/N0205', competency_name: 'Blueprint & Engineering Drawings', score: 0.64, evidence_count: 2 },
-                  { nos_id: 'CSC/N0203', competency_name: 'Material Joint Prep & Cutting', score: 0.82, evidence_count: 3 },
-                ]).map((comp, idx) => {
-                  const score = Math.round((comp.score || comp.confidence || 0.75) * 100);
-                  return (
-                    <div
-                      key={idx}
-                      className="p-4 bg-[#080808] border border-white/10 hover:border-white/25 transition-all space-y-3"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <span className="text-[9px] font-mono font-bold uppercase tracking-widest px-1.5 py-0.5 bg-white/10 text-white border border-white/20">
-                            {comp.nos_id || 'NOS-STD-2026'}
-                          </span>
-                          <h4 className="font-sans font-bold text-white text-xs mt-1.5">
-                            {comp.competency_name || comp.nos_id}
-                          </h4>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-base font-bold text-white">
-                            {score}%
-                          </span>
-                          <div className="text-[9px] text-zinc-400 font-sans uppercase tracking-wider">
-                            Proficiency
+              {candidateCompetencies.length === 0 ? (
+                <EmptyState
+                  icon={Cpu}
+                  title="No Competencies Evaluated Yet"
+                  description="Run AI Analysis to extract competencies and map them against National Occupational Standards (NOS)."
+                  actionLabel="Run AI Analysis"
+                  onAction={() => analyzeMutation.mutate()}
+                />
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {candidateCompetencies.map((comp, idx) => {
+                    const score = Math.round((comp.score || comp.confidence || 0.75) * 100);
+                    return (
+                      <div
+                        key={idx}
+                        className="p-4 bg-[#080808] border border-white/10 hover:border-white/25 transition-all space-y-3"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <span className="text-[9px] font-mono font-bold uppercase tracking-widest px-1.5 py-0.5 bg-white/10 text-white border border-white/20">
+                              {comp.nos_id || 'NOS-STD-2026'}
+                            </span>
+                            <h4 className="font-sans font-bold text-white text-xs mt-1.5">
+                              {comp.competency_name || comp.nos_id}
+                            </h4>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-base font-bold text-white">
+                              {score}%
+                            </span>
+                            <div className="text-[9px] text-zinc-400 font-sans uppercase tracking-wider">
+                              Proficiency
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      {/* Progress Bar */}
-                      <div className="w-full bg-[#121214] h-1.5 overflow-hidden">
-                        <div
-                          className="h-full bg-white transition-all"
-                          style={{ width: `${score}%` }}
-                        />
-                      </div>
+                        {/* Progress Bar */}
+                        <div className="w-full bg-[#121214] h-1.5 overflow-hidden">
+                          <div
+                            className="h-full bg-white transition-all"
+                            style={{ width: `${score}%` }}
+                          />
+                        </div>
 
-                      <div className="flex items-center justify-between text-[10px] text-zinc-400 font-sans pt-1 border-t border-white/5">
-                        <span>Evidence: {comp.evidence_count || 1} samples</span>
-                        <span className={score >= 70 ? 'text-zinc-200' : 'text-zinc-400 font-medium'}>
-                          {score >= 70 ? 'Standard Met' : 'Demonstration Needed'}
-                        </span>
+                        <div className="flex items-center justify-between text-[10px] text-zinc-400 font-sans pt-1 border-t border-white/5">
+                          <span>Evidence: {comp.evidence_count || 1} samples</span>
+                          <span className={score >= 70 ? 'text-zinc-200' : 'text-zinc-400 font-medium'}>
+                            {score >= 70 ? 'Standard Met' : 'Demonstration Needed'}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -461,12 +466,12 @@ export function AssessmentWorkspacePage() {
                     <div className="space-y-1 max-w-xl">
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-bold text-white">
-                          TASK #{idx + 1}: {t.task_name || t.selected_task || t.title || 'Practical Welding Task'}
+                          TASK #{idx + 1}: {t.task_name || t.selected_task || t.title || 'Practical Assessment Task'}
                         </span>
                         <StatusBadge status={t.status || 'PENDING'} size="sm" />
                       </div>
                       <p className="text-[11px] text-zinc-400 font-sans leading-relaxed">
-                        {t.description || t.reason || 'Assess execution speed, joint root pass penetration, and safety equipment handling.'}
+                        {t.description || t.reason || 'Assess execution speed, technique compliance, and safety equipment handling.'}
                       </p>
                       <div className="flex items-center gap-3 text-[10px] text-zinc-500 pt-1">
                         {t.priority_score && (
@@ -489,7 +494,7 @@ export function AssessmentWorkspacePage() {
                             setTaskResultModal({
                               isOpen: true,
                               taskId: t.id || idx,
-                              taskTitle: t.task_name || t.selected_task || 'Task Evaluation',
+                              taskTitle: t.task_name || t.selected_task || t.title || 'Task Evaluation',
                             })
                           }
                           className="text-[10px]"
@@ -527,11 +532,11 @@ export function AssessmentWorkspacePage() {
                   AI Advisory Recommendation
                 </span>
                 <span className="text-[10px] font-mono px-2 py-0.5 bg-white/10 text-white border border-white/20">
-                  {aiRecommendation ? aiRecommendation.replace(/_/g, ' ') : 'Recommend Certification'}
+                  {aiRecommendation ? aiRecommendation.replace(/_/g, ' ') : 'Pending Analysis'}
                 </span>
               </div>
               <p className="text-xs text-zinc-300 font-sans leading-relaxed">
-                Based on declared experience ({worker?.years_of_experience || 0} years), {candidateCompetencies.length || 5} mapped standards, and multi-modal evidence confidence scores.
+                Based on declared experience ({worker?.years_of_experience || 0} years), {candidateCompetencies.length} mapped standards, and multi-modal evidence confidence scores.
               </p>
             </div>
 
@@ -543,11 +548,11 @@ export function AssessmentWorkspacePage() {
                     <span>Certified Assessor Decision</span>
                   </span>
                   <span className="text-[10px] font-mono px-2 py-0.5 bg-white text-black font-bold">
-                    {decision.action ? decision.action.replace(/_/g, ' ') : 'Certification Approved'}
+                    {decision.action ? decision.action.replace(/_/g, ' ') : 'Certification Decision Recorded'}
                   </span>
                 </div>
                 <p className="text-xs text-zinc-300 font-sans">
-                  <strong>Notes:</strong> {decision.comments || 'Candidate demonstrated verified competencies in compliance with NCVET NOS requirements.'}
+                  <strong>Notes:</strong> {decision.comments || 'No remarks provided.'}
                 </p>
                 <p className="text-[10px] text-zinc-500 font-sans pt-1">
                   Recorded by Assessor #{decision.assessor_id || 'lead_assessor'} • {new Date(decision.decided_at || assessment.updated_at).toLocaleString()}
@@ -716,10 +721,10 @@ export function AssessmentWorkspacePage() {
             value={decisionAction}
             onChange={(e) => setDecisionAction(e.target.value)}
             options={[
-              { value: 'ACCEPT_RECOMMENDATION', label: 'Accept Recommendation — Certify RPL Level' },
-              { value: 'PARTIAL_CERTIFICATION', label: 'Partial Certification — Issue Gap Bridge Plan' },
-              { value: 'REJECT_CERTIFICATION', label: 'Reject — Evidence Below Standard Threshold' },
-              { value: 'REQUEST_REASSESSMENT', label: 'Request Re-Assessment — Practical Demonstration' },
+              { value: 'ACCEPT_RECOMMENDATION', label: 'Accept Recommendation — Full RPL Certification' },
+              { value: 'MODIFY_RECOMMENDATION', label: 'Modify Recommendation — Partial Certification / Gap Bridge' },
+              { value: 'REJECT_RECOMMENDATION', label: 'Reject Recommendation — Insufficient Evidence Benchmark' },
+              { value: 'REQUEST_MORE_EVIDENCE', label: 'Request More Evidence — Additional Practical Demonstration' },
             ]}
           />
 
@@ -740,11 +745,12 @@ export function AssessmentWorkspacePage() {
               Cancel
             </Button>
             <Button
+              type="primary"
               variant="primary"
               onClick={() =>
                 recordDecisionMutation.mutate({
                   action: decisionAction,
-                  comments: decisionComments || 'Certified in accordance with NCVET standards.',
+                  comments: decisionComments || 'Assessor formal review recorded.',
                 })
               }
               loading={recordDecisionMutation.isPending}

@@ -164,12 +164,12 @@ export function CompetenciesPage() {
         <div className="mt-6 pt-4 border-t border-white/10 flex flex-wrap items-center justify-between text-[11px] font-mono text-zinc-500 gap-4">
           <div className="flex items-center gap-3">
             <span className="text-zinc-300 font-bold">
-              {isWorker ? 'Your Profile' : 'Candidate'}: {selectedWorker?.full_name || selectedWorker?.name || user?.full_name || 'Ramesh Kumar'}
+              {isWorker ? 'Your Profile' : 'Candidate'}: {selectedWorker?.full_name || selectedWorker?.name || user?.full_name || (profileLoading || workersLoading ? 'Loading...' : 'None Selected')}
             </span>
             <span>•</span>
-            <span>Trade: {selectedWorker?.trade || 'Electrical Installation'}</span>
+            <span>Trade: {selectedWorker?.trade || (profileLoading || workersLoading ? 'Loading...' : 'N/A')}</span>
             <span>•</span>
-            <span>Experience: {selectedWorker?.years_of_experience || selectedWorker?.experience_years || 6} Years</span>
+            <span>Experience: {selectedWorker?.years_of_experience ?? selectedWorker?.experience_years ?? 0} Years</span>
           </div>
           <div className="flex items-center gap-1.5 text-zinc-300">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />

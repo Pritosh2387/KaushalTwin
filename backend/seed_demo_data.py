@@ -1,7 +1,7 @@
 """
 KaushalTwin — Database Seeder for SIH 2026 Evaluation Demo
 Seeds MongoDB with demo assessor, admin, worker accounts, sample candidates,
-active assessments, and verified evidence.
+active assessments, and verified evidence using deterministic UUIDs.
 """
 
 import asyncio
@@ -13,6 +13,13 @@ from app.core.config import settings
 from app.core.security import hash_password
 from app.db.models.user import UserRole
 
+# Fixed namespace for deterministic, idempotent UUID generation
+SEED_NAMESPACE = uuid.UUID("a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d")
+
+
+def deterministic_id(key: str) -> uuid.UUID:
+    return uuid.uuid5(SEED_NAMESPACE, key)
+
 
 async def seed():
     client = AsyncIOMotorClient(settings.MONGODB_URL, uuidRepresentation="standard")
@@ -23,7 +30,7 @@ async def seed():
     # 1. Seed Users
     users_data = [
         {
-            "id": uuid.uuid4(),
+            "id": deterministic_id("user:assessor@kaushaltwin.gov.in"),
             "name": "Lead Assessor Sharma",
             "email": "assessor@kaushaltwin.gov.in",
             "hashed_password": hash_password("assessor123"),
@@ -33,7 +40,7 @@ async def seed():
             "updated_at": datetime.now(timezone.utc),
         },
         {
-            "id": uuid.uuid4(),
+            "id": deterministic_id("user:admin@kaushaltwin.gov.in"),
             "name": "System Administrator",
             "email": "admin@kaushaltwin.gov.in",
             "hashed_password": hash_password("admin123"),
@@ -43,7 +50,7 @@ async def seed():
             "updated_at": datetime.now(timezone.utc),
         },
         {
-            "id": uuid.uuid4(),
+            "id": deterministic_id("user:worker@kaushaltwin.gov.in"),
             "name": "Ramesh Kumar",
             "email": "worker@kaushaltwin.gov.in",
             "hashed_password": hash_password("worker123"),
@@ -62,7 +69,7 @@ async def seed():
         else:
             await db.users.update_one(
                 {"email": u["email"]},
-                {"$set": {"hashed_password": u["hashed_password"], "name": u["name"]}}
+                {"$set": {"hashed_password": u["hashed_password"], "name": u["name"], "role": u["role"]}}
             )
             print(f"Updated user: {u['email']}")
 
@@ -74,7 +81,7 @@ async def seed():
     # 2. Seed Workers
     workers_data = [
         {
-            "id": uuid.uuid4(),
+            "id": deterministic_id("worker:Suraj Kumar Nishad"),
             "user_id": assessor_id,
             "full_name": "Suraj Kumar Nishad",
             "phone": "+91 98765 43210",
@@ -90,7 +97,7 @@ async def seed():
             "updated_at": datetime.now(timezone.utc),
         },
         {
-            "id": uuid.uuid4(),
+            "id": deterministic_id("worker:Ramesh Kumar Verma"),
             "user_id": worker_user_id,
             "full_name": "Ramesh Kumar Verma",
             "phone": "+91 98111 22334",
@@ -106,7 +113,7 @@ async def seed():
             "updated_at": datetime.now(timezone.utc),
         },
         {
-            "id": uuid.uuid4(),
+            "id": deterministic_id("worker:Sunita Devi"),
             "user_id": assessor_id,
             "full_name": "Sunita Devi",
             "phone": "+91 97222 33445",
@@ -128,6 +135,17 @@ async def seed():
         if not existing:
             await db.workers.insert_one(w)
             print(f"Created worker: {w['full_name']} ({w['trade']})")
+        else:
+            await db.workers.update_one(
+                {"full_name": w["full_name"]},
+                {"$set": {
+                    "trade": w["trade"],
+                    "years_of_experience": w["years_of_experience"],
+                    "declared_skills": w["declared_skills"],
+                    "experience_summary": w["experience_summary"],
+                    "user_id": w["user_id"]
+                }}
+            )
 
     suraj = await db.workers.find_one({"full_name": "Suraj Kumar Nishad"})
     ramesh = await db.workers.find_one({"full_name": "Ramesh Kumar Verma"})
@@ -135,7 +153,7 @@ async def seed():
     # 3. Seed Assessments
     assessments_data = [
         {
-            "id": uuid.uuid4(),
+            "id": deterministic_id("assessment:Suraj Kumar Nishad"),
             "worker_id": suraj["id"],
             "assessor_id": assessor_id,
             "trade": "Welding & Fabrication",
@@ -169,7 +187,7 @@ async def seed():
             ],
             "tasks": [
                 {
-                    "id": str(uuid.uuid4()),
+                    "id": str(deterministic_id("task:suraj:smaw_test")),
                     "task_name": "Butt Joint Horizontal 3G SMAW Test",
                     "description": "Execute single V-butt weld on 10mm MS plate following standard WPS and safety protocols.",
                     "status": "COMPLETED",
@@ -178,7 +196,7 @@ async def seed():
                     "comments": "Uniform bead width and proper root penetration observed.",
                 },
                 {
-                    "id": str(uuid.uuid4()),
+                    "id": str(deterministic_id("task:suraj:blueprint")),
                     "task_name": "Joint Blueprint Measurement & Tolerances",
                     "description": "Interpret welding symbols and mark workpiece according to technical drawings.",
                     "status": "PENDING",
@@ -190,7 +208,7 @@ async def seed():
             "updated_at": datetime.now(timezone.utc),
         },
         {
-            "id": uuid.uuid4(),
+            "id": deterministic_id("assessment:Ramesh Kumar Verma"),
             "worker_id": ramesh["id"],
             "assessor_id": assessor_id,
             "trade": "Electrical Installation",
@@ -221,11 +239,21 @@ async def seed():
         if not existing:
             await db.assessments.insert_one(a)
             print(f"Created assessment for worker: {a['trade']}")
+        else:
+            await db.assessments.update_one(
+                {"worker_id": a["worker_id"]},
+                {"$set": {
+                    "status": a["status"],
+                    "candidate_competencies": a["candidate_competencies"],
+                    "tasks": a["tasks"],
+                    "updated_at": datetime.now(timezone.utc)
+                }}
+            )
 
     # 4. Seed Evidence
     evidence_data = [
         {
-            "id": uuid.uuid4(),
+            "id": deterministic_id("evidence:suraj:work_sample"),
             "worker_id": suraj["id"],
             "evidence_type": "WORK_SAMPLE",
             "source_type": "DIRECT_ENTRY",
@@ -233,13 +261,14 @@ async def seed():
             "nos_id": "CSC/N0204",
             "verification_status": "VERIFIED",
             "verification_notes": "Clean weld bead with no porosity or undercut observed upon visual inspection.",
+            "verified_by_id": assessor_id,
             "verified_by_user_id": assessor_id,
             "verified_at": datetime.now(timezone.utc),
             "created_at": datetime.now(timezone.utc),
             "updated_at": datetime.now(timezone.utc),
         },
         {
-            "id": uuid.uuid4(),
+            "id": deterministic_id("evidence:suraj:photograph"),
             "worker_id": suraj["id"],
             "evidence_type": "PHOTOGRAPH",
             "source_type": "UPLOAD",
@@ -247,20 +276,25 @@ async def seed():
             "nos_id": "CSC/N1335",
             "verification_status": "VERIFIED",
             "verification_notes": "Adheres to workshop safety standard ISO 45001.",
+            "verified_by_id": assessor_id,
             "verified_by_user_id": assessor_id,
             "verified_at": datetime.now(timezone.utc),
             "created_at": datetime.now(timezone.utc),
             "updated_at": datetime.now(timezone.utc),
         },
         {
-            "id": uuid.uuid4(),
+            "id": deterministic_id("evidence:ramesh:experience"),
             "worker_id": ramesh["id"],
             "uploaded_by_id": worker_user_id,
             "evidence_type": "EXPERIENCE_DECLARATION",
             "source_type": "DIRECT_ENTRY",
             "description": "Supervisor reference letter from Verma Electricals certifying 6 years site experience.",
             "nos_id": "ELE/N5801",
-            "verification_status": "PENDING",
+            "verification_status": "PENDING_REVIEW",
+            "verification_notes": "Awaiting assessor verification of supervisor credentials.",
+            "verified_by_id": None,
+            "verified_by_user_id": None,
+            "verified_at": None,
             "created_at": datetime.now(timezone.utc),
             "updated_at": datetime.now(timezone.utc),
         },
@@ -272,11 +306,16 @@ async def seed():
             await db.evidence.insert_one(ev)
             print(f"Created evidence item: {ev['description'][:40]}...")
         else:
-            if "uploaded_by_id" in ev:
-                await db.evidence.update_one(
-                    {"description": ev["description"]},
-                    {"$set": {"uploaded_by_id": ev["uploaded_by_id"]}}
-                )
+            await db.evidence.update_one(
+                {"description": ev["description"]},
+                {"$set": {
+                    "verification_status": ev["verification_status"],
+                    "verification_notes": ev["verification_notes"],
+                    "verified_by_id": ev.get("verified_by_id"),
+                    "verified_by_user_id": ev.get("verified_by_user_id"),
+                    "verified_at": ev.get("verified_at"),
+                }}
+            )
 
     # Ensure worker user_id link is saved for Ramesh
     await db.workers.update_one(

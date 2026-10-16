@@ -26,6 +26,9 @@ Important:
 
 from __future__ import annotations
 
+import asyncio
+import time
+from datetime import datetime, timezone
 import logging
 from contextlib import asynccontextmanager
 
@@ -34,9 +37,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
-from app.db.mongodb import connect_to_mongo, close_mongo_connection
+from app.db.mongodb import connect_to_mongo, close_mongo_connection, mongo_manager
 from app.api.v1 import api_router
 from app.services.ml_client import init_ml_client, close_ml_client
+
 
 # Embedded ML Routers
 from ml.api.preprocessing import router as ml_preprocess_router
@@ -168,19 +172,94 @@ app.include_router(ml_explainability_router, prefix=ML_PREFIX)
 app.include_router(ml_evaluation_router, prefix=ML_PREFIX)
 
 # ---------------------------------------------------------------------------
-# Health checks
+# Genuine System Health Diagnostics
 # ---------------------------------------------------------------------------
+
+async def perform_system_health():
+    """Execute live diagnostic tests on MongoDB and AI Engine without exposing secrets."""
+    now = datetime.now(timezone.utc)
+    db_status = "unavailable"
+    db_latency_ms = None
+    db_error = None
+
+    # 1. Real MongoDB ping with timeout
+    try:
+        if mongo_manager.client is not None:
+            t0 = time.perf_counter()
+            await asyncio.wait_for(mongo_manager.client.admin.command("ping"), timeout=2.0)
+            db_latency_ms = round((time.perf_counter() - t0) * 1000, 2)
+            db_status = "operational"
+        else:
+            db_error = "MongoDB client not initialized"
+    except Exception as exc:
+        db_status = "unavailable"
+        db_error = str(exc)
+
+    # 2. Real AI Competency Engine inspection
+    ai_status = "operational"
+    ai_details: dict = {}
+    try:
+        from ml.trade_registry import trade_registry
+        from ml.services.skill_service import extract_skills
+
+        trades = trade_registry.list_supported_trades()
+        test_extraction = extract_skills("residential wiring MCB installation")
+        ai_details = {
+            "status": "operational",
+            "provider_type": "in_process_semantic_and_rule_matching",
+            "is_mock_llm": False,
+            "supported_trades_count": len(trades),
+            "smoke_test_extracted_skills_count": len(test_extraction),
+            "pipeline_ready": True,
+        }
+    except Exception as exc:
+        ai_status = "degraded"
+        ai_details = {
+            "status": "degraded",
+            "provider_type": "in_process_semantic_and_rule_matching",
+            "error": str(exc),
+            "pipeline_ready": False,
+        }
+
+    # Overall service status
+    if db_status == "operational" and ai_status == "operational":
+        overall_status = "operational"
+    elif db_status == "operational" or ai_status == "operational":
+        overall_status = "degraded"
+    else:
+        overall_status = "unavailable"
+
+    return {
+        "status": overall_status,
+        "service": settings.APP_NAME,
+        "version": "0.2.0",
+        "env": settings.APP_ENV,
+        "timestamp": now.isoformat(),
+        "dependencies": {
+            "fastapi": {
+                "status": "operational",
+                "service": "FastAPI Application",
+            },
+            "mongodb": {
+                "status": db_status,
+                "driver": "Motor Async Driver",
+                "database": settings.MONGODB_DB_NAME,
+                "latency_ms": db_latency_ms,
+                "error": db_error,
+            },
+            "ai_competency_engine": ai_details,
+        },
+    }
+
 
 @app.get("/health", tags=["Health"])
 async def health():
-    """Backend and database liveness probe."""
-    return {
-        "status": "ok",
-        "service": settings.APP_NAME,
-        "database": "mongodb",
-        "version": "0.2.0",
-        "env": settings.APP_ENV,
-    }
+    return await perform_system_health()
+
+
+@app.get(f"{settings.API_PREFIX}/health", tags=["Health"])
+async def api_health():
+    return await perform_system_health()
 
 
 @app.get("/", tags=["Health"])
@@ -193,3 +272,4 @@ async def root():
         "api_prefix": settings.API_PREFIX,
         "ml_prefix": ML_PREFIX,
     }
+

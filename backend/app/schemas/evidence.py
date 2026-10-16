@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime
 from typing import Optional, Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class EvidenceCreateRequest(BaseModel):
@@ -28,9 +28,22 @@ class EvidenceUpdateRequest(BaseModel):
 
 class EvidenceVerifyRequest(BaseModel):
     verification_status: str = Field(
-        ..., description="VERIFIED | REJECTED | PENDING_REVIEW"
+        ..., description="VERIFIED | REJECTED | PENDING_REVIEW | UNVERIFIED"
     )
     verification_notes: Optional[str] = None
+
+    @field_validator("verification_status")
+    @classmethod
+    def normalize_status(cls, v: str) -> str:
+        s = v.upper().strip()
+        if s == "NEEDS_INFO":
+            return "PENDING_REVIEW"
+        if s == "PENDING":
+            return "PENDING_REVIEW"
+        valid_statuses = {"VERIFIED", "REJECTED", "PENDING_REVIEW", "UNVERIFIED"}
+        if s not in valid_statuses:
+            raise ValueError(f"Invalid verification status: {v}. Must be one of {valid_statuses}")
+        return s
 
 
 class EvidenceResponse(BaseModel):
@@ -48,6 +61,8 @@ class EvidenceResponse(BaseModel):
     content_hash: Optional[str] = None
     verification_status: str
     verification_notes: Optional[str] = None
+    verified_by_id: Optional[uuid.UUID] = None
+    verified_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 

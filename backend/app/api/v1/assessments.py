@@ -1,7 +1,7 @@
 """
 KaushalTwin Backend — API Routes: Assessments + Tasks + ML integration + Decisions + Reports
 
-POST   /api/v1/assessments                                    — Create assessment
+POST   /api/v1/assessments                                    — Create or resume assessment
 GET    /api/v1/assessments                                    — List assessments
 GET    /api/v1/assessments/{id}                               — Get assessment
 PATCH  /api/v1/assessments/{id}                               — Update assessment
@@ -78,10 +78,19 @@ router = APIRouter(prefix="/assessments", tags=["Assessments"])
 # Helpers
 # ---------------------------------------------------------------------------
 
+def _match_id(val: uuid.UUID | str) -> dict:
+    s_val = str(val)
+    try:
+        u_val = uuid.UUID(s_val)
+        return {"$in": [s_val, u_val]}
+    except (ValueError, TypeError):
+        return {"$eq": s_val}
+
+
 async def _get_assessment_or_404(
     assessment_id: uuid.UUID, db: AsyncIOMotorDatabase
 ) -> Assessment:
-    id_q = {"$in": [str(assessment_id), assessment_id]}
+    id_q = _match_id(assessment_id)
     doc = await db.assessments.find_one({"id": id_q})
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found")
@@ -89,11 +98,12 @@ async def _get_assessment_or_404(
 
 
 def _assert_assessor_owns(assessment: Assessment, current_user: User) -> None:
-    """Only the assigned assessor or admin can modify an assessment."""
+    """Only the assigned assessor or admins can modify an assessment."""
     if current_user.role == UserRole.ADMIN:
         return
-    if str(assessment.assessor_id) != str(current_user.id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    if current_user.role == UserRole.ASSESSOR and str(assessment.assessor_id) == str(current_user.id):
+        return
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
 
 def _assert_can_view(assessment: Assessment, current_user: User, worker: Optional[WorkerProfile] = None) -> None:
@@ -112,24 +122,40 @@ def _assert_can_view(assessment: Assessment, current_user: User, worker: Optiona
     "",
     response_model=AssessmentResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Create a new assessment",
+    summary="Create or resume an assessment",
 )
 async def create_assessment(
     body: AssessmentCreateRequest,
     db: AsyncIOMotorDatabase = Depends(get_db),
     current_user: User = Depends(require_assessor),
 ) -> AssessmentResponse:
-    worker_doc = await db.workers.find_one({"id": str(body.worker_id)})
+    worker_id_q = _match_id(body.worker_id)
+    worker_doc = await db.workers.find_one({"$or": [{"id": worker_id_q}, {"user_id": worker_id_q}]})
     if not worker_doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Worker not found")
 
+    worker = WorkerProfile.from_mongo(worker_doc)
+
+    # Check for active existing assessment to prevent duplicate creation and support resuming
+    existing = await db.assessments.find_one({
+        "worker_id": _match_id(worker.id),
+        "trade": body.trade,
+        "status": {"$in": ["DRAFT", "ENROLLED", "IN_PROGRESS", "READY_FOR_REVIEW"]},
+    })
+    if existing:
+        logger.info("Resuming existing active assessment %s for worker %s (%s)", existing["id"], worker.id, body.trade)
+        return AssessmentResponse.model_validate(Assessment.from_mongo(existing))
+
+    now = datetime.now(timezone.utc)
     assessment = Assessment(
         id=uuid.uuid4(),
-        worker_id=body.worker_id,
+        worker_id=worker.id,
         assessor_id=current_user.id,
         trade=body.trade,
         notes=body.notes,
         status="DRAFT",
+        created_at=now,
+        updated_at=now,
     )
     doc = assessment.to_mongo()
     await db.assessments.insert_one(doc)
@@ -141,7 +167,8 @@ async def create_assessment(
         entity_id=str(assessment.id),
         actor_user_id=current_user.id,
         actor_label=current_user.email,
-        metadata={"worker_id": str(body.worker_id), "trade": body.trade},
+        actor_role=current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role),
+        metadata={"worker_id": str(worker.id), "trade": body.trade},
     )
 
     return AssessmentResponse.model_validate(assessment)
@@ -156,17 +183,18 @@ async def list_assessments(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     status_filter: Optional[str] = Query(None, alias="status"),
+    worker_id: Optional[uuid.UUID] = Query(None),
     db: AsyncIOMotorDatabase = Depends(get_db),
     current_user: User = Depends(require_assessor),
 ) -> AssessmentListResponse:
     query: dict = {}
-    if current_user.role == UserRole.ASSESSOR:
-        query["assessor_id"] = str(current_user.id)
+    if worker_id:
+        query["worker_id"] = _match_id(worker_id)
     if status_filter:
         query["status"] = status_filter.upper()
 
     total = await db.assessments.count_documents(query)
-    cursor = db.assessments.find(query).skip(skip).limit(limit)
+    cursor = db.assessments.find(query).skip(skip).limit(limit).sort("created_at", -1)
     items = []
     async for doc in cursor:
         items.append(AssessmentResponse.model_validate(Assessment.from_mongo(doc)))
@@ -190,7 +218,7 @@ async def get_assessment(
     current_user: User = Depends(get_current_active_user),
 ) -> AssessmentResponse:
     assessment = await _get_assessment_or_404(assessment_id, db)
-    w_q = {"$in": [str(assessment.worker_id), assessment.worker_id]}
+    w_q = _match_id(assessment.worker_id)
     worker_doc = await db.workers.find_one({"id": w_q})
     worker = WorkerProfile.from_mongo(worker_doc) if worker_doc else None
     _assert_can_view(assessment, current_user, worker)
@@ -208,14 +236,15 @@ async def update_assessment(
     db: AsyncIOMotorDatabase = Depends(get_db),
     current_user: User = Depends(require_assessor),
 ) -> AssessmentResponse:
+    id_q = _match_id(assessment_id)
     assessment = await _get_assessment_or_404(assessment_id, db)
     _assert_assessor_owns(assessment, current_user)
 
     update_data = body.model_dump(exclude_unset=True)
     update_data["updated_at"] = datetime.now(timezone.utc)
-    await db.assessments.update_one({"id": str(assessment_id)}, {"$set": update_data})
+    await db.assessments.update_one({"id": id_q}, {"$set": update_data})
 
-    updated_doc = await db.assessments.find_one({"id": str(assessment_id)})
+    updated_doc = await db.assessments.find_one({"id": id_q})
     return AssessmentResponse.model_validate(Assessment.from_mongo(updated_doc))
 
 
@@ -229,19 +258,20 @@ async def start_assessment(
     db: AsyncIOMotorDatabase = Depends(get_db),
     current_user: User = Depends(require_assessor),
 ) -> AssessmentResponse:
+    id_q = _match_id(assessment_id)
     assessment = await _get_assessment_or_404(assessment_id, db)
     _assert_assessor_owns(assessment, current_user)
 
     status_str = assessment.status if isinstance(assessment.status, str) else assessment.status.value
-    if status_str != "DRAFT":
+    if status_str not in ("DRAFT", "ENROLLED"):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Assessment is {status_str}, not DRAFT",
+            detail=f"Assessment is {status_str}, not DRAFT or ENROLLED",
         )
 
     now = datetime.now(timezone.utc)
     await db.assessments.update_one(
-        {"id": str(assessment_id)},
+        {"id": id_q},
         {"$set": {"status": "IN_PROGRESS", "started_at": now, "updated_at": now}},
     )
 
@@ -249,12 +279,14 @@ async def start_assessment(
         db,
         action="ASSESSMENT_STARTED",
         entity_type="Assessment",
-        entity_id=str(assessment_id),
+        entity_id=str(assessment.id),
         actor_user_id=current_user.id,
         actor_label=current_user.email,
+        actor_role=current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role),
+        metadata={"worker_id": str(assessment.worker_id), "trade": assessment.trade},
     )
 
-    updated_doc = await db.assessments.find_one({"id": str(assessment_id)})
+    updated_doc = await db.assessments.find_one({"id": id_q})
     return AssessmentResponse.model_validate(Assessment.from_mongo(updated_doc))
 
 
@@ -268,6 +300,7 @@ async def complete_assessment(
     db: AsyncIOMotorDatabase = Depends(get_db),
     current_user: User = Depends(require_assessor),
 ) -> AssessmentResponse:
+    id_q = _match_id(assessment_id)
     assessment = await _get_assessment_or_404(assessment_id, db)
     _assert_assessor_owns(assessment, current_user)
 
@@ -280,7 +313,7 @@ async def complete_assessment(
 
     now = datetime.now(timezone.utc)
     await db.assessments.update_one(
-        {"id": str(assessment_id)},
+        {"id": id_q},
         {"$set": {"status": "READY_FOR_REVIEW", "completed_at": now, "updated_at": now}},
     )
 
@@ -288,12 +321,14 @@ async def complete_assessment(
         db,
         action="ASSESSMENT_COMPLETED",
         entity_type="Assessment",
-        entity_id=str(assessment_id),
+        entity_id=str(assessment.id),
         actor_user_id=current_user.id,
         actor_label=current_user.email,
+        actor_role=current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role),
+        metadata={"worker_id": str(assessment.worker_id), "trade": assessment.trade},
     )
 
-    updated_doc = await db.assessments.find_one({"id": str(assessment_id)})
+    updated_doc = await db.assessments.find_one({"id": id_q})
     return AssessmentResponse.model_validate(Assessment.from_mongo(updated_doc))
 
 
@@ -318,7 +353,7 @@ async def create_task(
 
     task = AssessmentTask(
         id=uuid.uuid4(),
-        assessment_id=assessment_id,
+        assessment_id=assessment.id,
         title=body.title,
         description=body.description,
         target_nos_id=body.target_nos_id,
@@ -336,7 +371,8 @@ async def create_task(
         entity_id=str(task.id),
         actor_user_id=current_user.id,
         actor_label=current_user.email,
-        metadata={"title": task.title, "source": body.selection_source},
+        actor_role=current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role),
+        metadata={"title": task.title, "source": body.selection_source, "assessment_id": str(assessment.id)},
     )
 
     return TaskResponse.model_validate(task)
@@ -353,11 +389,11 @@ async def list_tasks(
     current_user: User = Depends(get_current_active_user),
 ) -> list[TaskResponse]:
     assessment = await _get_assessment_or_404(assessment_id, db)
-    worker_doc = await db.workers.find_one({"id": str(assessment.worker_id)})
+    worker_doc = await db.workers.find_one({"id": _match_id(assessment.worker_id)})
     worker = WorkerProfile.from_mongo(worker_doc) if worker_doc else None
     _assert_can_view(assessment, current_user, worker)
 
-    cursor = db.assessment_tasks.find({"assessment_id": str(assessment_id)})
+    cursor = db.assessment_tasks.find({"assessment_id": _match_id(assessment_id)})
     tasks = []
     async for doc in cursor:
         tasks.append(TaskResponse.model_validate(AssessmentTask.from_mongo(doc)))
@@ -379,8 +415,10 @@ async def submit_task_result(
     assessment = await _get_assessment_or_404(assessment_id, db)
     _assert_assessor_owns(assessment, current_user)
 
+    task_id_q = _match_id(task_id)
+    asm_id_q = _match_id(assessment_id)
     task_doc = await db.assessment_tasks.find_one(
-        {"id": str(task_id), "assessment_id": str(assessment_id)}
+        {"id": task_id_q, "assessment_id": asm_id_q}
     )
     if not task_doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
@@ -400,19 +438,20 @@ async def submit_task_result(
         "evidence_references": ev_refs,
         "completed_at": now,
     }
-    await db.assessment_tasks.update_one({"id": str(task_id)}, {"$set": update_data})
+    await db.assessment_tasks.update_one({"id": task_id_q}, {"$set": update_data})
 
     await audit_service.record_event(
         db,
         action="TASK_EVALUATED",
         entity_type="AssessmentTask",
-        entity_id=str(task_id),
+        entity_id=str(task_doc.get("id")),
         actor_user_id=current_user.id,
         actor_label=current_user.email,
-        metadata={"score": body.score},
+        actor_role=current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role),
+        metadata={"score": body.score, "assessment_id": str(assessment.id)},
     )
 
-    updated_doc = await db.assessment_tasks.find_one({"id": str(task_id)})
+    updated_doc = await db.assessment_tasks.find_one({"id": task_id_q})
     return TaskResponse.model_validate(AssessmentTask.from_mongo(updated_doc))
 
 
@@ -439,50 +478,43 @@ async def analyze_assessment(
     assessment = await _get_assessment_or_404(assessment_id, db)
     _assert_assessor_owns(assessment, current_user)
 
-    worker_doc = await db.workers.find_one({"id": str(assessment.worker_id)})
+    worker_doc = await db.workers.find_one({"id": _match_id(assessment.worker_id)})
     if not worker_doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Worker not found")
     worker = WorkerProfile.from_mongo(worker_doc)
 
     # Gather evidence
-    ev_cursor = db.evidence.find({"worker_id": str(assessment.worker_id)})
+    ev_cursor = db.evidence.find({"worker_id": _match_id(assessment.worker_id)})
     evidence_records = []
     async for e in ev_cursor:
         evidence_records.append(e)
 
     # Gather completed tasks
-    task_cursor = db.assessment_tasks.find(
-        {"assessment_id": str(assessment_id), "status": "COMPLETED"}
-    )
+    task_cursor = db.assessment_tasks.find({
+        "assessment_id": _match_id(assessment_id),
+        "status": "COMPLETED",
+    })
     completed_tasks = []
     async for t in task_cursor:
         completed_tasks.append(t)
 
-    # Transcript from worker summaries
-    transcript_parts = []
-    if worker.experience_summary:
-        transcript_parts.append(f"Work Experience: {worker.experience_summary}")
-    if worker.education_summary:
-        transcript_parts.append(f"Education: {worker.education_summary}")
-    for ev in evidence_records:
-        if ev.get("description"):
-            transcript_parts.append(f"Evidence ({ev.get('evidence_type')}): {ev['description']}")
-    transcript = "\n".join(transcript_parts) or f"Worker has {worker.years_of_experience} years in {worker.trade}."
+    # Build transcript from worker data
+    transcript = (
+        body.claim_for_explanation
+        or worker.work_narrative
+        or worker.experience_summary
+        or f"{worker.trade} practitioner with {worker.years_of_experience} years of hands-on experience."
+    )
 
-    # Evidence payload
     evidence_payload = [
         {
             "evidence_id": str(e["id"]),
             "type": e.get("evidence_type", "OTHER"),
-            "source": e.get("source_type", "SELF"),
-            "description": e.get("description", ""),
-            "nos_id": e.get("nos_id"),
             "verified": e.get("verification_status") == "VERIFIED",
         }
         for e in evidence_records
     ]
 
-    # Task scores
     assessor_scores = [
         {
             "task_id": str(t["id"]),
@@ -492,10 +524,9 @@ async def analyze_assessment(
         for t in completed_tasks
     ]
 
-    # Create AI run record in PENDING status
     ai_run = AIAssessmentRun(
         id=uuid.uuid4(),
-        assessment_id=assessment_id,
+        assessment_id=assessment.id,
         worker_id=assessment.worker_id,
         run_status="RUNNING",
     )
@@ -517,7 +548,7 @@ async def analyze_assessment(
 
         now = datetime.now(timezone.utc)
         await db.ai_runs.update_one(
-            {"id": str(ai_run.id)},
+            {"id": _match_id(ai_run.id)},
             {
                 "$set": {
                     "run_status": "COMPLETED",
@@ -530,7 +561,7 @@ async def analyze_assessment(
 
         # Transition assessment to READY_FOR_REVIEW
         await db.assessments.update_one(
-            {"id": str(assessment_id)},
+            {"id": _match_id(assessment_id)},
             {"$set": {"status": "READY_FOR_REVIEW", "updated_at": now}},
         )
 
@@ -541,16 +572,17 @@ async def analyze_assessment(
             entity_id=str(ai_run.id),
             actor_user_id=current_user.id,
             actor_label=current_user.email,
-            metadata={"recommendation": recommendation_str},
+            actor_role=current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role),
+            metadata={"recommendation": recommendation_str, "assessment_id": str(assessment.id)},
         )
 
-        updated_run = await db.ai_runs.find_one({"id": str(ai_run.id)})
+        updated_run = await db.ai_runs.find_one({"id": _match_id(ai_run.id)})
         return AIRunResponse.model_validate(AIAssessmentRun.from_mongo(updated_run))
 
     except MLServiceError as exc:
         now = datetime.now(timezone.utc)
         await db.ai_runs.update_one(
-            {"id": str(ai_run.id)},
+            {"id": _match_id(ai_run.id)},
             {"$set": {"run_status": "FAILED", "error_detail": str(exc), "created_at": now}},
         )
         await audit_service.record_event(
@@ -560,7 +592,8 @@ async def analyze_assessment(
             entity_id=str(ai_run.id),
             actor_user_id=current_user.id,
             actor_label=current_user.email,
-            metadata={"error": str(exc)},
+            actor_role=current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role),
+            metadata={"error": str(exc), "assessment_id": str(assessment.id)},
         )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -579,11 +612,11 @@ async def get_ai_results(
     current_user: User = Depends(get_current_active_user),
 ) -> list[AIRunResponse]:
     assessment = await _get_assessment_or_404(assessment_id, db)
-    worker_doc = await db.workers.find_one({"id": str(assessment.worker_id)})
+    worker_doc = await db.workers.find_one({"id": _match_id(assessment.worker_id)})
     worker = WorkerProfile.from_mongo(worker_doc) if worker_doc else None
     _assert_can_view(assessment, current_user, worker)
 
-    cursor = db.ai_runs.find({"assessment_id": str(assessment_id)}).sort("created_at", -1)
+    cursor = db.ai_runs.find({"assessment_id": _match_id(assessment_id)}).sort("created_at", -1)
     runs = []
     async for doc in cursor:
         runs.append(AIRunResponse.model_validate(AIAssessmentRun.from_mongo(doc)))
@@ -603,9 +636,8 @@ async def recommend_next_task(
     assessment = await _get_assessment_or_404(assessment_id, db)
     _assert_assessor_owns(assessment, current_user)
 
-    # Get latest completed AI run to get competency states
     latest_run = await db.ai_runs.find_one(
-        {"assessment_id": str(assessment_id), "run_status": "COMPLETED"},
+        {"assessment_id": _match_id(assessment_id), "run_status": "COMPLETED"},
         sort=[("created_at", -1)],
     )
 
@@ -620,8 +652,7 @@ async def recommend_next_task(
             detail="No competency data available. Run /analyze first.",
         )
 
-    # Exclude already existing tasks
-    task_cursor = db.assessment_tasks.find({"assessment_id": str(assessment_id)})
+    task_cursor = db.assessment_tasks.find({"assessment_id": _match_id(assessment_id)})
     existing_ml_ids = []
     async for t in task_cursor:
         if t.get("ml_task_id"):
@@ -643,7 +674,7 @@ async def recommend_next_task(
     if selected:
         persisted_task = AssessmentTask(
             id=uuid.uuid4(),
-            assessment_id=assessment_id,
+            assessment_id=assessment.id,
             title=selected.get("title", "Recommended Task"),
             description=selected.get("description"),
             target_nos_id=selected.get("nos_coverage", [{}])[0].get("nos_id") if selected.get("nos_coverage") else selected.get("nos_id"),
@@ -660,7 +691,7 @@ async def recommend_next_task(
     await db.ai_runs.insert_one(
         AIAssessmentRun(
             id=ai_run_id,
-            assessment_id=assessment_id,
+            assessment_id=assessment.id,
             worker_id=assessment.worker_id,
             run_status="COMPLETED",
             recommendation=selected.get("task_id") if selected else "NO_TASK_RECOMMENDED",
@@ -691,7 +722,7 @@ async def check_evidence_sufficiency(
     assessment = await _get_assessment_or_404(assessment_id, db)
     _assert_assessor_owns(assessment, current_user)
 
-    ev_cursor = db.evidence.find({"worker_id": str(assessment.worker_id)})
+    ev_cursor = db.evidence.find({"worker_id": _match_id(assessment.worker_id)})
     evidence_records = []
     async for e in ev_cursor:
         evidence_records.append({
@@ -701,7 +732,6 @@ async def check_evidence_sufficiency(
             "description": e.get("description", ""),
         })
 
-    # Default competencies
     competencies = [
         {"nos_id": "DEMO_NOS_001", "name": "Basic Operations", "score": 75},
         {"nos_id": "DEMO_NOS_002", "name": "Safety Protocols", "score": 80},
@@ -735,7 +765,7 @@ async def check_evidence_sufficiency(
     await db.ai_runs.insert_one(
         AIAssessmentRun(
             id=ai_run_id,
-            assessment_id=assessment_id,
+            assessment_id=assessment.id,
             worker_id=assessment.worker_id,
             run_status="COMPLETED",
             recommendation=abs_check.get("status", "ABSTAIN"),
@@ -752,7 +782,7 @@ async def check_evidence_sufficiency(
 
 @router.get(
     "/{assessment_id}/recommendation",
-    summary="Get latest AI recommendation without re-running pipeline",
+    summary="Get latest AI recommendation and assessor decision state",
 )
 async def get_latest_recommendation(
     assessment_id: uuid.UUID,
@@ -760,26 +790,42 @@ async def get_latest_recommendation(
     current_user: User = Depends(get_current_active_user),
 ) -> dict:
     assessment = await _get_assessment_or_404(assessment_id, db)
-    worker_doc = await db.workers.find_one({"id": str(assessment.worker_id)})
+    worker_doc = await db.workers.find_one({"id": _match_id(assessment.worker_id)})
     worker = WorkerProfile.from_mongo(worker_doc) if worker_doc else None
     _assert_can_view(assessment, current_user, worker)
 
     latest_run = await db.ai_runs.find_one(
-        {"assessment_id": str(assessment_id), "run_status": "COMPLETED"},
+        {"assessment_id": _match_id(assessment_id), "run_status": "COMPLETED"},
         sort=[("created_at", -1)],
     )
 
+    latest_decision_doc = await db.decisions.find_one(
+        {"assessment_id": _match_id(assessment_id)},
+        sort=[("created_at", -1)],
+    )
+    decision_dict = None
+    if latest_decision_doc:
+        decision_dict = {
+            "id": str(latest_decision_doc.get("id")),
+            "action": latest_decision_doc.get("action"),
+            "comments": latest_decision_doc.get("comments"),
+            "modified_recommendation": latest_decision_doc.get("modified_recommendation"),
+            "assessor_id": str(latest_decision_doc.get("assessor_id")),
+            "decided_at": latest_decision_doc.get("created_at"),
+        }
+
     if not latest_run:
         return {
-            "assessment_id": str(assessment_id),
+            "assessment_id": str(assessment.id),
             "has_recommendation": False,
             "message": "No completed AI analysis runs found. Trigger /analyze first.",
             "recommendation": None,
+            "decision": decision_dict,
         }
 
     ml_data = latest_run.get("ml_response") or {}
     return {
-        "assessment_id": str(assessment_id),
+        "assessment_id": str(assessment.id),
         "has_recommendation": True,
         "ai_run_id": str(latest_run["id"]),
         "recommendation": latest_run.get("recommendation"),
@@ -787,7 +833,8 @@ async def get_latest_recommendation(
         "abstention_decision": ml_data.get("abstention_decision"),
         "skill_gap_analysis": ml_data.get("skill_gap_analysis"),
         "analyzed_at": latest_run.get("created_at"),
-        "note": "This is an AI recommendation only. The human assessor makes the final decision.",
+        "decision": decision_dict,
+        "note": "AI recommendations are advisory only. The human assessor makes the final decision.",
     }
 
 
@@ -810,8 +857,16 @@ async def record_decision(
     assessment = await _get_assessment_or_404(assessment_id, db)
     _assert_assessor_owns(assessment, current_user)
 
+    raw_action = body.action.strip()
+    action_map = {
+        "PARTIAL_CERTIFICATION": "MODIFY_RECOMMENDATION",
+        "REJECT_CERTIFICATION": "REJECT_RECOMMENDATION",
+        "REQUEST_REASSESSMENT": "REQUEST_MORE_EVIDENCE",
+    }
+    normalized_action = action_map.get(raw_action, raw_action)
+
     try:
-        action = DecisionAction(body.action)
+        action = DecisionAction(normalized_action)
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -820,7 +875,7 @@ async def record_decision(
 
     decision = AssessorDecision(
         id=uuid.uuid4(),
-        assessment_id=assessment_id,
+        assessment_id=assessment.id,
         ai_run_id=body.ai_run_id,
         assessor_id=current_user.id,
         action=action.value,
@@ -830,23 +885,36 @@ async def record_decision(
     await db.decisions.insert_one(decision.to_mongo())
 
     now = datetime.now(timezone.utc)
+    id_q = _match_id(assessment_id)
     if action in (DecisionAction.ACCEPT_RECOMMENDATION, DecisionAction.MODIFY_RECOMMENDATION):
         await db.assessments.update_one(
-            {"id": str(assessment_id)},
-            {"$set": {"status": "REVIEWED", "updated_at": now}},
+            {"id": id_q},
+            {"$set": {"status": "REVIEWED", "completed_at": now, "updated_at": now}},
+        )
+    elif action == DecisionAction.REJECT_RECOMMENDATION:
+        await db.assessments.update_one(
+            {"id": id_q},
+            {"$set": {"status": "COMPLETED", "completed_at": now, "updated_at": now}},
+        )
+    elif action == DecisionAction.REQUEST_MORE_EVIDENCE:
+        await db.assessments.update_one(
+            {"id": id_q},
+            {"$set": {"status": "IN_PROGRESS", "updated_at": now}},
         )
 
     await audit_service.record_event(
         db,
-        action=f"ASSESSOR_DECISION_{action.value}",
+        action="ASSESSOR_DECISION_RECORDED",
         entity_type="Assessment",
-        entity_id=str(assessment_id),
+        entity_id=str(assessment.id),
         actor_user_id=current_user.id,
         actor_label=current_user.email,
+        actor_role=current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role),
         metadata={
             "decision_id": str(decision.id),
             "action": action.value,
             "ai_run_id": str(body.ai_run_id) if body.ai_run_id else None,
+            "comments": body.comments,
         },
     )
 
@@ -877,7 +945,7 @@ async def get_report(
     current_user: User = Depends(get_current_active_user),
 ) -> AssessmentReport:
     assessment = await _get_assessment_or_404(assessment_id, db)
-    w_q = {"$in": [str(assessment.worker_id), assessment.worker_id]}
+    w_q = _match_id(assessment.worker_id)
     worker_doc = await db.workers.find_one({"id": w_q})
     worker = WorkerProfile.from_mongo(worker_doc) if worker_doc else None
     _assert_can_view(assessment, current_user, worker)
@@ -889,26 +957,26 @@ async def get_report(
         evidence_records.append(EvidenceRecord.from_mongo(e))
 
     # Tasks
-    task_cursor = db.assessment_tasks.find({"assessment_id": str(assessment_id)})
+    task_cursor = db.assessment_tasks.find({"assessment_id": _match_id(assessment_id)})
     tasks = []
     async for t in task_cursor:
         tasks.append(AssessmentTask.from_mongo(t))
 
     # AI runs
-    run_cursor = db.ai_runs.find({"assessment_id": str(assessment_id)}).sort("created_at", -1)
+    run_cursor = db.ai_runs.find({"assessment_id": _match_id(assessment_id)}).sort("created_at", -1)
     ai_runs = []
     async for r in run_cursor:
         ai_runs.append(AIAssessmentRun.from_mongo(r))
 
     # Latest decision
     latest_decision_doc = await db.decisions.find_one(
-        {"assessment_id": str(assessment_id)},
+        {"assessment_id": _match_id(assessment_id)},
         sort=[("created_at", -1)],
     )
     latest_decision = AssessorDecision.from_mongo(latest_decision_doc) if latest_decision_doc else None
 
     # Audit trail
-    entity_ids = [str(assessment_id)] + [str(r.id) for r in ai_runs] + [str(t.id) for t in tasks]
+    entity_ids = [str(assessment.id)] + [str(r.id) for r in ai_runs] + [str(t.id) for t in tasks]
     audit_cursor = db.audit_events.find({
         "entity_type": {"$in": ["Assessment", "AIAssessmentRun", "AssessmentTask"]},
         "entity_id": {"$in": entity_ids},
@@ -931,6 +999,18 @@ async def get_report(
 
     status_str = assessment.status if isinstance(assessment.status, str) else assessment.status.value
 
+    # Record report generation audit event
+    await audit_service.record_event(
+        db,
+        action="DOSSIER_GENERATED",
+        entity_type="Assessment",
+        entity_id=str(assessment.id),
+        actor_user_id=current_user.id,
+        actor_label=current_user.email,
+        actor_role=current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role),
+        metadata={"trade": assessment.trade, "has_decision": latest_decision is not None},
+    )
+
     return AssessmentReport(
         generated_at=datetime.now(timezone.utc),
         worker={
@@ -950,7 +1030,7 @@ async def get_report(
         evidence_summary={
             "total": len(evidence_records),
             "verified": sum(1 for e in evidence_records if e.verification_status == "VERIFIED"),
-            "unverified": sum(1 for e in evidence_records if e.verification_status == "UNVERIFIED"),
+            "unverified": sum(1 for e in evidence_records if e.verification_status in ("UNVERIFIED", "PENDING", "PENDING_REVIEW")),
             "rejected": sum(1 for e in evidence_records if e.verification_status == "REJECTED"),
             "records": [
                 {

@@ -513,6 +513,24 @@ async def get_worker_competency_profile(
             competencies = assessment_doc["candidate_competencies"]
             has_profile = True
 
+    # Enrich competencies with verified evidence counts and status
+    evidence_cursor = db.evidence.find({"worker_id": w_q})
+    worker_evs = await evidence_cursor.to_list(length=100)
+
+    enriched_competencies = []
+    for comp in competencies:
+        c_dict = dict(comp)
+        nos_code = c_dict.get("nos_id") or c_dict.get("code")
+        matching_evs = [e for e in worker_evs if e.get("nos_id") == nos_code] if nos_code else []
+        verified_evs = [e for e in matching_evs if e.get("verification_status") == "VERIFIED"]
+
+        c_dict["evidence_count"] = len(matching_evs)
+        c_dict["verified_evidence_count"] = len(verified_evs)
+        has_verified_evidence = len(verified_evs) > 0
+        c_dict["verified"] = has_verified_evidence
+        c_dict["status"] = "Assessor-verified" if has_verified_evidence else "AI-aligned (Advisory)"
+        enriched_competencies.append(c_dict)
+
     status_str = (
         worker.assessment_status.value
         if hasattr(worker.assessment_status, "value")
@@ -524,9 +542,10 @@ async def get_worker_competency_profile(
         trade=worker.trade,
         assessment_status=status_str,
         latest_ai_run_id=uuid.UUID(str(latest_run["id"])) if latest_run and "id" in latest_run else None,
-        competencies=competencies,
+        competencies=enriched_competencies,
         summary=summary,
         skills_extracted=skills_extracted,
         nos_candidates=nos_candidates,
         has_profile=has_profile,
     )
+
