@@ -20,14 +20,7 @@ import {
   ArrowUpRight,
   ExternalLink,
 } from 'lucide-react';
-import {
-  Radar,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  ResponsiveContainer,
-} from 'recharts';
+import { CompetencyMappingChart } from '../../components/competencies/CompetencyMappingChart';
 import { workersApi } from '../../api/workers.api';
 import { evidenceApi } from '../../api/evidence.api';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
@@ -92,31 +85,12 @@ export function CompetenciesPage() {
   const selectedWorker = isWorker ? myProfile : workers.find((w) => w.id === currentWorkerId);
   const rawCompetencies = competencyProfile?.competencies || [];
 
-  // Production fallback demonstration data if candidate hasn't run ML pipeline
-  const fallbackCompetencies = (selectedWorker?.trade?.toLowerCase().includes('electr') || !selectedWorker?.trade) ? [
-    { competency_name: 'Residential Distribution & Circuit Wiring', nos_id: 'ELE/N5801', score: 0.82, benchmark: 0.70, evidence_count: 1, status: 'AI-suggested' },
-    { competency_name: 'Earthing & Fault Protection Setup', nos_id: 'ELE/N5802', score: 0.75, benchmark: 0.70, evidence_count: 1, status: 'AI-suggested' },
-    { competency_name: 'Inverter & Backup Power Installation', nos_id: 'ELE/N5803', score: 0.68, benchmark: 0.75, evidence_count: 0, status: 'Evidence pending' },
-    { competency_name: 'Industrial Motor Feeder Maintenance', nos_id: 'ELE/N5804', score: 0.55, benchmark: 0.70, evidence_count: 0, status: 'Evidence pending' },
-  ] : [
-    { competency_name: 'Arc & Gas Welding', nos_id: 'CSC/N0204', score: 0.88, benchmark: 0.70, evidence_count: 2, status: 'AI-suggested' },
-    { competency_name: 'Workplace Safety & Hazard Control', nos_id: 'CSC/N1335', score: 0.92, benchmark: 0.75, evidence_count: 1, status: 'Assessor-verified' },
-    { competency_name: 'Blueprint & Engineering Drawings', nos_id: 'CSC/N0205', score: 0.64, benchmark: 0.70, evidence_count: 1, status: 'Evidence pending' },
-    { competency_name: 'Material Joint Prep & Cutting', nos_id: 'CSC/N0203', score: 0.82, benchmark: 0.70, evidence_count: 1, status: 'Worker-submitted' },
-    { competency_name: 'Quality Inspection & Weld Testing', nos_id: 'CSC/N0206', score: 0.58, benchmark: 0.75, evidence_count: 0, status: 'Evidence pending' },
-  ];
-
-  const competencies = rawCompetencies.length > 0 ? rawCompetencies : fallbackCompetencies;
+  // True candidate competency profile (no synthetic or fabricated fallback data)
+  const competencies = rawCompetencies;
   const declaredSkills = selectedWorker?.declared_skills || [];
   const evidenceList = Array.isArray(evidenceData) ? evidenceData : (evidenceData?.items || []);
   const verifiedEvidenceCount = evidenceList.filter((e) => e.verification_status === 'VERIFIED').length;
   const totalEvidenceCount = evidenceList.length;
-
-  const chartData = competencies.map((c) => ({
-    subject: c.competency_name ? (c.competency_name.length > 20 ? c.competency_name.slice(0, 18) + '...' : c.competency_name) : c.nos_id,
-    Score: Math.round((c.score || 0.7) * 100),
-    Benchmark: Math.round((c.benchmark || 0.7) * 100),
-  }));
 
   // Accurate metric derivations
   const verifiedCompetenciesCount = competencies.filter(
@@ -304,60 +278,14 @@ export function CompetenciesPage() {
 
       {/* Main Visualizer: Monochromatic Radar & Vector Breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Radar Chart (7 cols) */}
-        <div className="lg:col-span-7 bg-[#050505] border border-white/10 p-6 specular-top-edge">
-          <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-4">
-            <div>
-              <h2 className="font-mono text-xs font-bold text-white uppercase tracking-wider">
-                COMPETENCY TWIN RADAR MAPPING
-              </h2>
-              <p className="text-[11px] text-zinc-400 font-light mt-0.5">
-                Comparison between candidate evaluated mastery and NSQF benchmark
-              </p>
-            </div>
-            <div className="flex items-center gap-4 text-[10px] font-mono">
-              <span className="flex items-center gap-1.5 text-white">
-                <span className="w-2.5 h-0.5 bg-white inline-block" /> CANDIDATE
-              </span>
-              <span className="flex items-center gap-1.5 text-zinc-400">
-                <span className="w-2.5 h-0.5 border-b border-dashed border-zinc-400 inline-block" /> BENCHMARK
-              </span>
-            </div>
-          </div>
-
-          <div className="h-80 sm:h-96 w-full flex items-center justify-center">
-            <ResponsiveContainer width="100%" height="100%">
-              <RadarChart data={chartData} cx="50%" cy="50%" outerRadius="75%">
-                <PolarGrid stroke="rgba(255, 255, 255, 0.12)" />
-                <PolarAngleAxis
-                  dataKey="subject"
-                  tick={{ fill: '#d4d4d8', fontSize: 10, fontFamily: 'monospace' }}
-                />
-                <PolarRadiusAxis
-                  angle={90}
-                  domain={[0, 100]}
-                  stroke="rgba(255, 255, 255, 0.2)"
-                  tick={{ fill: '#71717a', fontSize: 9, fontFamily: 'monospace' }}
-                />
-                <Radar
-                  name="Candidate Score"
-                  dataKey="Score"
-                  stroke="#ffffff"
-                  strokeWidth={2}
-                  fill="#ffffff"
-                  fillOpacity={0.12}
-                />
-                <Radar
-                  name="NOS Benchmark"
-                  dataKey="Benchmark"
-                  stroke="rgba(255, 255, 255, 0.45)"
-                  strokeWidth={1.5}
-                  strokeDasharray="4 4"
-                  fill="none"
-                />
-              </RadarChart>
-            </ResponsiveContainer>
-          </div>
+        {/* Competency Twin Visualizer (7 cols) */}
+        <div className="lg:col-span-7">
+          <CompetencyMappingChart
+            competencies={competencies}
+            isLoading={profileLoading}
+            isWorker={isWorker}
+            trade={selectedWorker?.trade}
+          />
         </div>
 
         {/* Competency Vector Breakdown (5 cols) */}
@@ -372,50 +300,61 @@ export function CompetenciesPage() {
               </p>
             </div>
 
-            <div className="space-y-4">
-              {competencies.map((comp, idx) => {
-                const scorePct = Math.round((comp.score || 0.7) * 100);
-                const benchPct = Math.round((comp.benchmark || 0.7) * 100);
-                const isProficient = scorePct >= benchPct;
+            {competencies.length === 0 ? (
+              <div className="py-8 text-center space-y-2">
+                <p className="text-xs font-mono text-zinc-500">No competency standards mapped yet.</p>
+                <p className="text-xs text-zinc-400 font-sans max-w-xs mx-auto">
+                  {isWorker
+                    ? 'Submit work evidence or describe your work experience in the portal to activate NOS standards mapping.'
+                    : 'Candidate has not submitted evidence for competency evaluation.'}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {competencies.map((comp, idx) => {
+                  const scorePct = Math.round((comp.score || 0.7) * 100);
+                  const benchPct = Math.round((comp.benchmark || 0.7) * 100);
+                  const isProficient = scorePct >= benchPct;
 
-                return (
-                  <div key={idx} className="space-y-1.5 font-mono text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="text-white font-bold text-[11px] truncate max-w-[200px]">
-                        {comp.competency_name || comp.nos_id}
-                      </span>
-                      <span className="text-[10px] text-zinc-400">
-                        {scorePct}% / {benchPct}% required
-                      </span>
-                    </div>
+                  return (
+                    <div key={idx} className="space-y-1.5 font-mono text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-white font-bold text-[11px] truncate max-w-[200px]">
+                          {comp.competency_name || comp.nos_id}
+                        </span>
+                        <span className="text-[10px] text-zinc-400">
+                          {scorePct}% / {benchPct}% required
+                        </span>
+                      </div>
 
-                    {/* Monochromatic Bar Indicator */}
-                    <div className="h-1.5 w-full bg-[#121214] relative overflow-hidden">
-                      <div
-                        className={`h-full ${isProficient ? 'bg-white' : 'bg-zinc-500'} transition-all`}
-                        style={{ width: `${scorePct}%` }}
-                      />
-                      <div
-                        className="absolute top-0 bottom-0 w-[1px] bg-white/70"
-                        style={{ left: `${benchPct}%` }}
-                        title="Benchmark threshold"
-                      />
-                    </div>
+                      {/* Monochromatic Bar Indicator */}
+                      <div className="h-1.5 w-full bg-[#121214] relative overflow-hidden">
+                        <div
+                          className={`h-full ${isProficient ? 'bg-white' : 'bg-zinc-500'} transition-all`}
+                          style={{ width: `${scorePct}%` }}
+                        />
+                        <div
+                          className="absolute top-0 bottom-0 w-[1px] bg-white/70"
+                          style={{ left: `${benchPct}%` }}
+                          title="Benchmark threshold"
+                        />
+                      </div>
 
-                    <div className="flex items-center justify-between text-[10px] font-sans text-zinc-400">
-                      <span className="font-mono text-[9px] text-zinc-500">{comp.nos_id}</span>
-                      <span className={isProficient ? 'text-zinc-200' : 'text-zinc-400 font-medium'}>
-                        {comp.status === 'Assessor-verified'
-                          ? 'Assessor Verified'
-                          : isProficient
-                          ? 'AI Match Met (Pending Assessor)'
-                          : 'Needs Evidence'}
-                      </span>
+                      <div className="flex items-center justify-between text-[10px] font-sans text-zinc-400">
+                        <span className="font-mono text-[9px] text-zinc-500">{comp.nos_id}</span>
+                        <span className={isProficient ? 'text-zinc-200' : 'text-zinc-400 font-medium'}>
+                          {comp.status === 'Assessor-verified'
+                            ? 'Assessor Verified'
+                            : isProficient
+                            ? 'AI Match Met (Pending Assessor)'
+                            : 'Needs Evidence'}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div className="pt-6 border-t border-white/10 mt-6">
@@ -454,7 +393,14 @@ export function CompetenciesPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
-                    {competencies.map((comp, idx) => (
+                    {competencies.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-8 text-center text-zinc-500 font-sans text-xs">
+                          No competency standards mapped yet for this candidate profile.
+                        </td>
+                      </tr>
+                    ) : (
+                      competencies.map((comp, idx) => (
                       <tr key={idx} className="hover:bg-white/[0.02]">
                         <td className="py-3.5 text-white font-bold">{comp.nos_id}</td>
                         <td className="py-3.5 text-zinc-300">{comp.competency_name || 'Competency Node'}</td>
@@ -481,7 +427,7 @@ export function CompetenciesPage() {
                           )}
                         </td>
                       </tr>
-                    ))}
+                    )))}
                   </tbody>
                 </table>
               </div>
