@@ -20,7 +20,7 @@
 ## Contents
 
 - [Overview](#-overview)
-- [🧭 Core principles](#-core-principles)
+- [Core principles](#-core-principles)
 - [🧩 Capabilities](#-capabilities)
 - [🏗️ Architecture](#️-architecture)
 - [🗂️ Repository structure](#️-repository-structure)
