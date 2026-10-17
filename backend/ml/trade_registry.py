@@ -468,3 +468,21 @@ def detect_trade_from_text(text: str) -> Tuple[str, float]:
         conf = round(min(0.65 + (best_score - second_score) * 0.10, 0.92), 2)
         return best_trade, conf
 
+
+class TradeRegistry:
+    """Registry providing metadata and query methods for supported occupational trades."""
+
+    @staticmethod
+    def list_supported_trades() -> List[str]:
+        """Return list of supported canonical trades (excluding generic cross-trade terms)."""
+        return [trade for trade in TRADE_SYNONYM_REGISTRY.keys() if trade != "general"]
+
+    @staticmethod
+    def get_synonyms(trade: str) -> SynonymMap:
+        """Return synonym map for a specified trade."""
+        return TRADE_SYNONYM_REGISTRY.get(trade.lower(), {})
+
+
+trade_registry = TradeRegistry()
+
+

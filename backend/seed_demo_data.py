@@ -143,7 +143,9 @@ async def seed():
                     "years_of_experience": w["years_of_experience"],
                     "declared_skills": w["declared_skills"],
                     "experience_summary": w["experience_summary"],
-                    "user_id": w["user_id"]
+                    "user_id": w["user_id"],
+                    "email": w.get("email"),
+                    "phone": w.get("phone"),
                 }}
             )
 

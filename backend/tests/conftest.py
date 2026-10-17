@@ -17,7 +17,8 @@ from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
 # Force testing configuration before app imports
 os.environ["APP_ENV"] = "testing"
-os.environ["MONGODB_URL"] = "mongodb://localhost:27017"
+mongo_test_url = os.environ.get("MONGODB_URL", "mongodb://localhost:27017")
+os.environ["MONGODB_URL"] = mongo_test_url
 os.environ["MONGODB_DB_NAME"] = "kaushaltwin_test"
 os.environ["JWT_SECRET_KEY"] = "test-secret-key-1234567890-test-secret"
 os.environ["ML_SERVICE_URL"] = "http://localhost:8000"
@@ -28,7 +29,7 @@ os.environ["UPLOAD_DIRECTORY"] = test_upload_dir
 
 from app.core.config import settings
 settings.UPLOAD_DIRECTORY = test_upload_dir
-settings.MONGODB_URL = "mongodb://localhost:27017"
+settings.MONGODB_URL = mongo_test_url
 settings.MONGODB_DB_NAME = "kaushaltwin_test"
 
 from app.core.dependencies import get_db
@@ -42,7 +43,7 @@ from app.main import app
 @pytest_asyncio.fixture
 async def db_session() -> AsyncGenerator[AsyncIOMotorDatabase, None]:
     """Provide a fresh MongoDB database connection per test function."""
-    client = AsyncIOMotorClient("mongodb://localhost:27017", uuidRepresentation="standard")
+    client = AsyncIOMotorClient(mongo_test_url, uuidRepresentation="standard")
     db = client["kaushaltwin_test"]
     mongo_manager.client = client
     mongo_manager.db = db

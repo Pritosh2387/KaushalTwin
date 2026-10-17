@@ -209,7 +209,7 @@ async def perform_system_health():
             "provider_type": "in_process_semantic_and_rule_matching",
             "is_mock_llm": False,
             "supported_trades_count": len(trades),
-            "smoke_test_extracted_skills_count": len(test_extraction),
+            "smoke_test_extracted_skills_count": getattr(test_extraction, "count", len(getattr(test_extraction, "skills", []))),
             "pipeline_ready": True,
         }
     except Exception as exc:

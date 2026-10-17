@@ -49,7 +49,7 @@ def _assert_worker_access(worker: WorkerProfile, current_user: User) -> None:
     if current_user.role in (UserRole.ADMIN, UserRole.ASSESSOR):
         return
     # Worker role: only own profile
-    if worker.user_id != current_user.id:
+    if str(worker.user_id) != str(current_user.id) and str(worker.id) != str(current_user.id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied",
@@ -147,7 +147,7 @@ async def _resolve_current_worker(db: AsyncIOMotorDatabase, current_user: User) 
         doc = await db.workers.find_one({"full_name": current_user.name})
         if not doc:
             doc = await db.workers.find_one({"full_name": {"$regex": f"^{current_user.name}", "$options": "i"}})
-    if doc and not doc.get("user_id"):
+    if doc and str(doc.get("user_id")) != str(current_user.id):
         await db.workers.update_one({"_id": doc["_id"]}, {"$set": {"user_id": str(current_user.id)}})
         doc["user_id"] = str(current_user.id)
 
