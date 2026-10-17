@@ -12,6 +12,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from app.core.config import settings
 from app.core.security import hash_password
 from app.db.models.user import UserRole
+from app.db.mongodb import get_safe_mongodb_target
 
 # Fixed namespace for deterministic, idempotent UUID generation
 SEED_NAMESPACE = uuid.UUID("a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d")
@@ -25,7 +26,7 @@ async def seed():
     client = AsyncIOMotorClient(settings.MONGODB_URL, uuidRepresentation="standard")
     db = client[settings.MONGODB_DB_NAME]
 
-    print("Connecting to MongoDB:", settings.MONGODB_URL, "DB:", settings.MONGODB_DB_NAME)
+    print(f"Connecting to {get_safe_mongodb_target(settings.MONGODB_URL)} | DB: {settings.MONGODB_DB_NAME}")
 
     # 1. Seed Users
     users_data = [

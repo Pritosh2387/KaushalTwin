@@ -37,7 +37,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
-from app.db.mongodb import connect_to_mongo, close_mongo_connection, mongo_manager
+from app.db.mongodb import connect_to_mongo, close_mongo_connection, mongo_manager, sanitize_mongodb_error
 from app.api.v1 import api_router
 from app.services.ml_client import init_ml_client, close_ml_client
 
@@ -193,7 +193,7 @@ async def perform_system_health():
             db_error = "MongoDB client not initialized"
     except Exception as exc:
         db_status = "unavailable"
-        db_error = str(exc)
+        db_error = sanitize_mongodb_error(exc, settings.MONGODB_URL)
 
     # 2. Real AI Competency Engine inspection
     ai_status = "operational"
