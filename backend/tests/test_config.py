@@ -112,6 +112,70 @@ def test_production_config_demo_mode_disabled():
         )
 
 
+def test_production_config_embedded_ml_default():
+    """Test that production defaults to embedded in-process ML without external URL."""
+    settings = get_clean_settings(
+        APP_ENV="production",
+        JWT_SECRET_KEY="production_secret_key_12345678901234567890",
+        MONGODB_URL="mongodb://production-host:27017",
+        CORS_ALLOWED_ORIGINS="https://kaushaltwin.vercel.app"
+    )
+
+    assert settings.APP_ENV == "production"
+    assert settings.ML_SERVICE_URL == "embedded"
+    assert settings.is_embedded_ml == True
+    assert settings.cors_origins_list == ["https://kaushaltwin.vercel.app"]
+
+
+def test_production_config_rejects_localhost_ml_url():
+    """Test that production rejects localhost ML_SERVICE_URL."""
+    with pytest.raises(ValidationError, match="ML_SERVICE_URL cannot be localhost in production"):
+        get_clean_settings(
+            APP_ENV="production",
+            JWT_SECRET_KEY="production_secret_key_12345678901234567890",
+            MONGODB_URL="mongodb://production-host:27017",
+            ML_SERVICE_URL="http://localhost:8000",
+            CORS_ALLOWED_ORIGINS="https://kaushaltwin.vercel.app"
+        )
+
+
+def test_production_config_cors_normalization():
+    """Test that production normalizes trailing slashes and multiple origins."""
+    settings = get_clean_settings(
+        APP_ENV="production",
+        JWT_SECRET_KEY="production_secret_key_12345678901234567890",
+        MONGODB_URL="mongodb://production-host:27017",
+        CORS_ALLOWED_ORIGINS="https://kaushaltwin.vercel.app/, https://kaushaltwin-preview.vercel.app"
+    )
+
+    assert settings.cors_origins_list == [
+        "https://kaushaltwin.vercel.app",
+        "https://kaushaltwin-preview.vercel.app"
+    ]
+
+
+def test_production_config_cors_rejects_wildcard():
+    """Test that production strictly rejects wildcard '*' CORS origin."""
+    with pytest.raises(ValidationError, match="Wildcard '\\*' CORS origin is not permitted"):
+        get_clean_settings(
+            APP_ENV="production",
+            JWT_SECRET_KEY="production_secret_key_12345678901234567890",
+            MONGODB_URL="mongodb://production-host:27017",
+            CORS_ALLOWED_ORIGINS="*"
+        )
+
+
+def test_production_config_cors_rejects_127():
+    """Test that production rejects 127.0.0.1 in CORS origins."""
+    with pytest.raises(ValidationError, match="should not contain localhost in production"):
+        get_clean_settings(
+            APP_ENV="production",
+            JWT_SECRET_KEY="production_secret_key_12345678901234567890",
+            MONGODB_URL="mongodb://production-host:27017",
+            CORS_ALLOWED_ORIGINS="http://127.0.0.1:3000"
+        )
+
+
 def test_llm_skill_provider_selection():
     """Test LLM skill provider selection when API key is provided."""
     settings = get_clean_settings(

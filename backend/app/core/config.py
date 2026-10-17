@@ -53,8 +53,8 @@ class Settings(BaseSettings):
     STT_PROVIDER: Literal["mock", "whisper"] = "mock"
     WHISPER_MODEL_SIZE: str = "base"
 
-    # ML Service (for external ML service calls)
-    ML_SERVICE_URL: str = "http://localhost:8000"
+    # ML Service (defaults to 'embedded' for unified in-process pipeline; or remote URL)
+    ML_SERVICE_URL: str = "embedded"
     ML_SERVICE_TIMEOUT: int = 30  # seconds
 
     # Demo Mode Configuration
@@ -93,22 +93,43 @@ class Settings(BaseSettings):
     @field_validator("ML_SERVICE_URL")
     @classmethod
     def validate_ml_service_url(cls, v: str, info: ValidationInfo) -> str:
+        v_clean = (v or "").strip()
+        if v_clean.lower() in ("embedded", "in-process", "internal", "none", ""):
+            return "embedded"
+
         if info.data.get("APP_ENV") == "production":
-            if not v or v == "http://localhost:8000":
-                raise ValueError("ML_SERVICE_URL must be configured for production use")
-        return v
+            v_lower = v_clean.lower()
+            if "localhost" in v_lower or "127.0.0.1" in v_lower:
+                raise ValueError(
+                    "ML_SERVICE_URL cannot be localhost in production. "
+                    "Use 'embedded' for the native in-process ML engine, or configure a valid remote HTTPS URL."
+                )
+            if not v_lower.startswith(("http://", "https://")):
+                raise ValueError("ML_SERVICE_URL must be 'embedded' or a valid URL starting with http:// or https://")
+        return v_clean
 
     @field_validator("CORS_ALLOWED_ORIGINS")
     @classmethod
     def validate_cors_origins(cls, v: str, info: ValidationInfo) -> str:
-        if info.data.get("APP_ENV") == "production":
-            origins = [o.strip() for o in v.split(",") if o.strip()]
-            for origin in origins:
-                if not origin.startswith(("http://", "https://")):
-                    raise ValueError(f"CORS origin '{origin}' must be a valid URL starting with http:// or https://")
-                if "localhost" in origin or "127.0.0.1" in origin:
-                    raise ValueError(f"CORS origin '{origin}' should not contain localhost in production")
-        return v
+        if not v or not v.strip():
+            raise ValueError("CORS_ALLOWED_ORIGINS cannot be empty")
+
+        raw_origins = [o.strip().rstrip("/") for o in v.split(",") if o.strip()]
+        if not raw_origins:
+            raise ValueError("CORS_ALLOWED_ORIGINS must contain at least one valid origin")
+
+        for origin in raw_origins:
+            if origin == "*":
+                raise ValueError("Wildcard '*' CORS origin is not permitted in production. Explicit origins are required.")
+            if not origin.startswith(("http://", "https://")):
+                raise ValueError(f"CORS origin '{origin}' must be a valid URL starting with http:// or https://")
+            if info.data.get("APP_ENV") == "production":
+                if "localhost" in origin.lower() or "127.0.0.1" in origin:
+                    raise ValueError(
+                        f"CORS origin '{origin}' should not contain localhost in production. "
+                        "Set CORS_ALLOWED_ORIGINS to your actual frontend domain (e.g. https://your-app.vercel.app)."
+                    )
+        return ",".join(raw_origins)
 
     @field_validator("DEMO_MODE")
     @classmethod
@@ -148,6 +169,10 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.APP_ENV == "production"
+
+    @property
+    def is_embedded_ml(self) -> bool:
+        return self.ML_SERVICE_URL.lower() in ("embedded", "in-process", "internal", "none", "")
 
     @property
     def uses_demo_skill_provider(self) -> bool:

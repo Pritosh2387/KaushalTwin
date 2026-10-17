@@ -43,13 +43,17 @@ def get_ml_client() -> httpx.AsyncClient:
 async def init_ml_client(app_instance: Optional[Any] = None) -> None:
     """Create the shared async client. Call once at app startup."""
     global _client
-    if app_instance is not None:
+    if app_instance is not None or settings.is_embedded_ml:
+        target_app = app_instance
+        if target_app is None:
+            from app.main import app as main_app
+            target_app = main_app
         _client = httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app_instance),
+            transport=httpx.ASGITransport(app=target_app),
             base_url="http://local-backend",
             timeout=httpx.Timeout(settings.ML_SERVICE_TIMEOUT),
         )
-        logger.info("ML client initialised in-process with ASGI transport")
+        logger.info("ML client initialised in-process with ASGI transport (embedded mode)")
     else:
         _client = httpx.AsyncClient(
             base_url=settings.ML_SERVICE_URL,
@@ -81,8 +85,9 @@ async def _post(path: str, payload: dict[str, Any]) -> dict[str, Any]:
             f"ML service timed out after {settings.ML_SERVICE_TIMEOUT}s: {path}"
         ) from exc
     except httpx.RequestError as exc:
+        target_desc = "in-process engine" if settings.is_embedded_ml else settings.ML_SERVICE_URL
         raise MLServiceError(
-            f"ML service unreachable at {settings.ML_SERVICE_URL}{path}: {exc}"
+            f"ML service unreachable at {target_desc}{path}: {exc}"
         ) from exc
 
     if response.status_code >= 400:
