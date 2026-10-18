@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowUpRight,
   ChevronDown,
@@ -19,12 +19,34 @@ import {
 import { ObsidianCrystalHero } from '../../components/3d/ObsidianCrystalHero';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
+import { LoginPalette } from '../../components/auth/LoginPalette';
 import { useAuth } from '../../context/AuthContext';
 
 export function LandingPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { isAuthenticated, user } = useAuth();
   const [activeFacet, setActiveFacet] = useState(0);
+
+  const [loginPaletteOpen, setLoginPaletteOpen] = useState(() => searchParams.get('login') === 'true');
+  const [paletteInitialRole, setPaletteInitialRole] = useState(null);
+  const isSignedOut = searchParams.get('signed_out') === 'true';
+
+  useEffect(() => {
+    if (searchParams.get('login') === 'true') {
+      setLoginPaletteOpen(true);
+    }
+  }, [searchParams]);
+
+  const handleClosePalette = () => {
+    setLoginPaletteOpen(false);
+    if (searchParams.has('login') || searchParams.has('signed_out')) {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete('login');
+      nextParams.delete('signed_out');
+      setSearchParams(nextParams, { replace: true });
+    }
+  };
 
   const capabilities = [
     { id: '01', title: 'Evidence Verification', subtitle: 'Multi-modal portfolio verification & tampering detection' },
@@ -46,11 +68,12 @@ export function LandingPage() {
     { code: '10', name: 'Verifiable Audit & Transparency', desc: 'Tamper-evident activity logs and explainable reasoning' },
   ];
 
-  const handleEnterPlatform = () => {
+  const handleEnterPlatform = (role = null) => {
     if (isAuthenticated) {
       navigate('/dashboard');
     } else {
-      navigate('/login');
+      if (role) setPaletteInitialRole(role);
+      setLoginPaletteOpen(true);
     }
   };
 
@@ -106,14 +129,17 @@ export function LandingPage() {
           ) : (
             <div className="flex items-center gap-3">
               <Button
-                onClick={() => navigate('/login')}
+                onClick={() => {
+                  setPaletteInitialRole(null);
+                  setLoginPaletteOpen(true);
+                }}
                 variant="secondary"
                 size="sm"
               >
                 Sign In
               </Button>
               <Button
-                onClick={handleEnterPlatform}
+                onClick={() => handleEnterPlatform()}
                 variant="primary"
                 size="sm"
               >
@@ -484,7 +510,7 @@ export function LandingPage() {
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
             <Button
-              onClick={handleEnterPlatform}
+              onClick={() => handleEnterPlatform()}
               variant="primary"
               size="lg"
               className="text-xs sm:text-sm font-semibold tracking-wider px-10 py-4 uppercase"
@@ -492,7 +518,7 @@ export function LandingPage() {
               Get Started ↗
             </Button>
             <Button
-              onClick={() => navigate('/login')}
+              onClick={() => handleEnterPlatform('ASSESSOR')}
               variant="secondary"
               size="lg"
               className="text-xs sm:text-sm tracking-wider px-8 py-4 uppercase"
@@ -511,6 +537,14 @@ export function LandingPage() {
           <span className="text-zinc-400">RPL Prior Learning Recognition</span>
         </div>
       </footer>
+
+      {/* Interactive Login Palette */}
+      <LoginPalette
+        isOpen={loginPaletteOpen}
+        onClose={handleClosePalette}
+        initialRole={paletteInitialRole}
+        signedOut={isSignedOut}
+      />
     </div>
   );
 }

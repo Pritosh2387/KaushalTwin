@@ -81,12 +81,15 @@ export function AuthProvider({ children }) {
     }
   }, [login]);
 
-  const logout = useCallback(() => {
+  const logout = useCallback((options = {}) => {
     localStorage.removeItem('kaushaltwin_token');
     localStorage.removeItem('kaushaltwin_user');
     setToken(null);
     setUser(null);
-    window.location.href = '/login';
+    if (options && options.redirect !== false) {
+      const target = options.to || '/?login=true&signed_out=true';
+      window.location.href = target;
+    }
   }, []);
 
   const value = {

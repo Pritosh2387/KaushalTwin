@@ -47,9 +47,9 @@ apiClient.interceptors.response.use(
           // Ignore storage errors
         }
 
-        // Avoid redirect loops: do not redirect if already on /login
-        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-          window.location.href = '/login';
+        // Avoid redirect loops: do not redirect if already on login query
+        if (typeof window !== 'undefined' && !window.location.search.includes('login=true')) {
+          window.location.href = '/?login=true&session_expired=true';
         }
       }
 

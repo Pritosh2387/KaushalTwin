@@ -48,7 +48,8 @@ export default function App() {
             <Route path="/hero" element={<LandingPage />} />
 
             {/* Public Auth Routes */}
-            <Route path="/login" element={<LoginPage />} />
+            <Route path="/login" element={<Navigate to="/?login=true" replace />} />
+            <Route path="/auth/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
 
             {/* Authenticated Application Shell */}

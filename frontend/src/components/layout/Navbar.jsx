@@ -18,8 +18,8 @@ export function Navbar({ onMobileMenuToggle }) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const handleLogout = () => {
-    logout();
-    navigate('/login');
+    logout({ redirect: false });
+    navigate('/?login=true&signed_out=true');
   };
 
   return (
